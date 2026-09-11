@@ -6,7 +6,8 @@ import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "./icons/Tran
 import { MuteIcon, VolumeIcon, VolumeLowIcon, VolumeMinIcon } from "./icons/VolumeIcons";
 
 export function GlobalPlayerBar() {
-  const { track, isPlaying, volume, isMuted, togglePlay, next, prev, setVolume, toggleMute } = usePlayer();
+  const { track, isPlaying, isAudioPlaying, volume, isMuted, togglePlay, next, prev, setVolume, toggleMute } =
+    usePlayer();
 
   const volumeLevel = isMuted ? "mute" : volume >= 2 / 3 ? "high" : volume >= 1 / 3 ? "low" : "min";
   const VolumeGlyph = isMuted
@@ -85,7 +86,7 @@ export function GlobalPlayerBar() {
             <span className="text-muted">Nothing Playing</span>
           )}
         </div>
-        <VinylMark size={80} spinning={isPlaying} />
+        <VinylMark size={80} spinning={isAudioPlaying} flat={!track} />
       </div>
     </div>
   );
