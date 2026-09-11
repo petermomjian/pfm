@@ -21,17 +21,6 @@ export function Slider({ value, max, onChange, width = 128, dimmed = false, ...a
           style={{ width: `${percent}%`, backgroundColor: "var(--primary)" }}
         />
       </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute rounded-full border"
-        style={{
-          left: `calc(${percent}% - 12px)`,
-          width: 24,
-          height: 16,
-          backgroundColor: "#ffffff",
-          borderColor: "#e5e5e5",
-        }}
-      />
       <input
         type="range"
         min={0}
@@ -40,7 +29,18 @@ export function Slider({ value, max, onChange, width = 128, dimmed = false, ...a
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={aria["aria-label"]}
-        className="pfm-slider-input"
+        className="peer pfm-slider-input"
+      />
+      <div
+        aria-hidden
+        className="pfm-interactive pointer-events-none absolute rounded-full border peer-hover:scale-110 peer-active:scale-110 peer-focus-visible:scale-110 peer-focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
+        style={{
+          left: `calc(${percent}% - 12px)`,
+          width: 24,
+          height: 16,
+          backgroundColor: "#ffffff",
+          borderColor: "#e5e5e5",
+        }}
       />
     </div>
   );
