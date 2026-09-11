@@ -1,7 +1,8 @@
-import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { Volume2 } from "lucide-react";
 import { usePlayer } from "@/player/PlayerContext";
 import { Slider } from "./Slider";
 import { VinylMark } from "./VinylMark";
+import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "./icons/TransportIcons";
 
 export function GlobalPlayerBar() {
   const { track, isPlaying, volume, togglePlay, next, prev, setVolume } = usePlayer();
@@ -28,7 +29,7 @@ export function GlobalPlayerBar() {
             disabled={!track}
             className="flex size-20 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
           >
-            <SkipBack size={24} />
+            <SkipBackIcon size={24} />
           </button>
           <button
             type="button"
@@ -37,7 +38,7 @@ export function GlobalPlayerBar() {
             disabled={!track}
             className="flex size-20 items-center justify-center rounded-full border border-[var(--border-input)] transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:border-[var(--surface-border)] focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
           >
-            {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+            {isPlaying ? <PauseIcon size={24} /> : <PlayIcon size={24} />}
           </button>
           <button
             type="button"
@@ -46,7 +47,7 @@ export function GlobalPlayerBar() {
             disabled={!track}
             className="flex size-20 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
           >
-            <SkipForward size={24} />
+            <SkipForwardIcon size={24} />
           </button>
         </div>
       </div>
