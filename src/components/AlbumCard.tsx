@@ -1,23 +1,65 @@
+import type { CSSProperties } from "react";
 import { Play } from "lucide-react";
 import type { Album } from "@/data/albums";
 
-export const ALBUM_CARD_WIDTH = 214;
+// Visible thickness of the sleeve's front edge — the part of every sleeve
+// that stays on-screen even when its face has rotated edge-on at center.
+export const SPINE_WIDTH = 6;
 
-interface AlbumCardProps {
+interface AlbumSleeveProps {
+  album: Album;
+  size: number; // px — square face depth/height, shared with the perspective scene's height
+  onSelect: (albumId: string) => void;
+}
+
+export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
+  const faceStyle: CSSProperties = {
+    width: size,
+    height: size,
+    backgroundColor: "var(--surface)",
+    borderColor: "var(--surface-border)",
+    transformOrigin: "left top",
+    backfaceVisibility: "hidden",
+  };
+
+  return (
+    <div
+      className="relative h-full shrink-0 cursor-pointer"
+      style={{ width: SPINE_WIDTH, transformStyle: "preserve-3d" }}
+      onClick={() => onSelect(album.id)}
+    >
+      <div
+        className="absolute inset-y-0 left-0 border"
+        style={{
+          width: SPINE_WIDTH,
+          backgroundColor: "var(--surface)",
+          borderColor: "var(--surface-border)",
+        }}
+      />
+      {/* Face extends backward from the spine into -Z; the sleeve passing
+          through screen center becomes edge-on purely from that projection. */}
+      <div className="absolute left-0 top-0 border" style={{ ...faceStyle, transform: "rotateY(90deg)" }} />
+      {/* Same plane, opposite normal (scaleZ flips facing without moving the
+          geometry) — keeps the far side of center from disappearing. */}
+      <div className="absolute left-0 top-0 border" style={{ ...faceStyle, transform: "rotateY(90deg) scaleZ(-1)" }} />
+    </div>
+  );
+}
+
+interface AlbumMetaProps {
   album: Album;
   onSelect: (albumId: string) => void;
   onPlay: (albumId: string) => void;
-  slotRef?: (el: HTMLDivElement | null) => void;
-  coverRef?: (el: HTMLDivElement | null) => void;
 }
 
-export function AlbumCard({ album, onSelect, onPlay, slotRef, coverRef }: AlbumCardProps) {
+export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
   return (
-    <div
-      className="flex w-[214px] shrink-0 flex-col items-start gap-[54px] cursor-pointer"
-      onClick={() => onSelect(album.id)}
-    >
-      <div className="flex w-full flex-col items-start gap-[36px]">
+    <div className="relative shrink-0" style={{ width: SPINE_WIDTH }}>
+      <div
+        className="absolute bottom-0 left-0 flex flex-col items-start gap-[36px] cursor-pointer"
+        style={{ width: "var(--slot-width)" }}
+        onClick={() => onSelect(album.id)}
+      >
         <div className="flex w-full flex-col items-start gap-1.5 pr-8 text-xs">
           <p className="w-full text-foreground">{album.title}</p>
           <p className="w-full text-muted">{album.artist}</p>
@@ -33,23 +75,6 @@ export function AlbumCard({ album, onSelect, onPlay, slotRef, coverRef }: AlbumC
         >
           <Play size={16} fill="currentColor" />
         </button>
-      </div>
-      <div ref={slotRef} className="relative h-[768px] w-full" style={{ perspective: 1400 }}>
-        <div
-          ref={coverRef}
-          className="absolute inset-0 border"
-          style={{
-            backgroundColor: "var(--surface)",
-            borderColor: "var(--surface-border)",
-          }}
-        >
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: "linear-gradient(90deg, rgba(255,255,255,0.14), rgba(0,0,0,0.35))",
-            }}
-          />
-        </div>
       </div>
     </div>
   );

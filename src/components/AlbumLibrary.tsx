@@ -1,31 +1,33 @@
 import { useEffect, useRef } from "react";
 import { albums } from "@/data/albums";
-import { AlbumCard } from "./AlbumCard";
+import { AlbumSleeve, AlbumMeta, SPINE_WIDTH } from "./AlbumCard";
 
 interface AlbumLibraryProps {
   onSelect: (albumId: string) => void;
   onPlay: (albumId: string) => void;
 }
 
-const EDGE_PADDING = 64; // matches the px-16 inset used by Header / GlobalPlayerBar
-const CARD_GAP = 8; // constant gap between panels, independent of their rotation
-const MAX_ANGLE = 52; // degrees a panel reaches once it's fully receded to the side
-const FALLOFF_CARDS = 2.6; // how many card-widths from center it takes to reach MAX_ANGLE
-const ANGLE_EASE = 0.28; // per-frame lerp toward the target angle, for a smooth settle
+const SPACING_VW = 0.15; // spine-to-spine pitch, as a fraction of viewport width
+const SLEEVE_TOP_VH = 0.47; // sleeve top edge, as a fraction of viewport height — also the perspective's vertical vanishing point
+const SLEEVE_SIZE = 768; // px — square face depth/height, and the perspective scene's height
+const GAP_ABOVE_SLEEVE = 54; // px between the metadata block and the sleeve top
+const PERSPECTIVE = 1200; // shared stationary camera depth
 const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
 const RUBBER_BAND = 0.35; // resistance applied when dragging past the scroll bounds
 const CLICK_DRAG_THRESHOLD = 6; // px of pointer movement before a click becomes a drag
+const WHEEL_LINE_HEIGHT = 16; // px per "line" when a wheel event reports deltaMode 1
 
 export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const coverRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const cardAngles = useRef<number[]>(albums.map(() => 0));
+  const metaTrackRef = useRef<HTMLDivElement | null>(null);
 
+  const spacing = useRef(SLEEVE_SIZE * SPACING_VW);
   const x = useRef(0);
   const velocity = useRef(0);
   const minX = useRef(0);
+  const maxX = useRef(0);
+  const initialized = useRef(false);
   const dragging = useRef(false);
   const dragStartClientX = useRef(0);
   const dragStartX = useRef(0);
@@ -33,15 +35,33 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const lastPointerX = useRef(0);
   const lastPointerTime = useRef(0);
 
-  const clampTarget = (value: number) => Math.min(0, Math.max(minX.current, value));
+  const clampTarget = (value: number) => Math.min(maxX.current, Math.max(minX.current, value));
 
   useEffect(() => {
     const measure = () => {
       const viewport = viewportRef.current;
       const track = trackRef.current;
-      if (!viewport || !track) return;
-      minX.current = Math.min(0, viewport.clientWidth - track.scrollWidth - EDGE_PADDING);
-      x.current = clampTarget(x.current);
+      const metaTrack = metaTrackRef.current;
+      if (!viewport || !track || !metaTrack) return;
+
+      const spacingPx = window.innerWidth * SPACING_VW;
+      spacing.current = spacingPx;
+      const gapPx = spacingPx - SPINE_WIDTH;
+      track.style.gap = `${gapPx}px`;
+      metaTrack.style.gap = `${gapPx}px`;
+      metaTrack.style.setProperty("--slot-width", `${spacingPx}px`);
+
+      const centerX = viewport.clientWidth / 2;
+      const lastIndex = albums.length - 1;
+      maxX.current = centerX; // spine 0 can reach screen center
+      minX.current = centerX - lastIndex * spacingPx; // last spine can reach screen center
+
+      if (!initialized.current) {
+        x.current = maxX.current; // open with the first album centered
+        initialized.current = true;
+      } else {
+        x.current = clampTarget(x.current);
+      }
     };
     measure();
     window.addEventListener("resize", measure);
@@ -57,8 +77,8 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       lastTime = time;
 
       if (!dragging.current) {
-        if (x.current > 0 || x.current < minX.current) {
-          const target = x.current > 0 ? 0 : minX.current;
+        if (x.current > maxX.current || x.current < minX.current) {
+          const target = x.current > maxX.current ? maxX.current : minX.current;
           x.current += (target - x.current) * 0.22;
           velocity.current = 0;
         } else {
@@ -74,32 +94,10 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       }
 
       const track = trackRef.current;
-      const viewport = viewportRef.current;
-      if (track) track.style.transform = `translateX(${x.current}px)`;
-
-      if (viewport) {
-        const viewportRect = viewport.getBoundingClientRect();
-        const viewportCenter = viewportRect.left + viewportRect.width / 2;
-        const falloff = FALLOFF_CARDS * (slotRefs.current[0]?.getBoundingClientRect().width || 214);
-
-        slotRefs.current.forEach((slot, i) => {
-          const cover = coverRefs.current[i];
-          if (!slot || !cover) return;
-          const rect = slot.getBoundingClientRect();
-          const cardCenter = rect.left + rect.width / 2;
-          const signedDistance = cardCenter - viewportCenter;
-          const normalized = Math.max(-1, Math.min(1, signedDistance / falloff));
-          const target = normalized * MAX_ANGLE;
-
-          const current = cardAngles.current[i] + (target - cardAngles.current[i]) * ANGLE_EASE;
-          cardAngles.current[i] = current;
-
-          const depth = -Math.abs(current) * 2.2;
-          const shade = 1 - Math.min(0.4, Math.abs(current) / MAX_ANGLE) * 0.4;
-          cover.style.transform = `rotateY(${current}deg) translateZ(${depth}px)`;
-          cover.style.filter = `brightness(${shade})`;
-        });
-      }
+      const metaTrack = metaTrackRef.current;
+      const transform = `translateX(${x.current}px)`;
+      if (track) track.style.transform = transform;
+      if (metaTrack) metaTrack.style.transform = transform;
 
       frame = requestAnimationFrame(tick);
     };
@@ -113,10 +111,10 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     if (!viewport) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      const atBound = (x.current >= 0 && delta < 0) || (x.current <= minX.current && delta > 0);
+      const scale = e.deltaMode === 1 ? WHEEL_LINE_HEIGHT : e.deltaMode === 2 ? window.innerHeight : 1;
+      const delta = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * scale;
+      const atBound = (x.current >= maxX.current && delta < 0) || (x.current <= minX.current && delta > 0);
       x.current += atBound ? -delta * RUBBER_BAND * 0.3 : -delta;
-      velocity.current = -delta * 0.12;
     };
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
@@ -139,7 +137,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     if (Math.abs(dx) > CLICK_DRAG_THRESHOLD) dragMoved.current = true;
 
     const raw = dragStartX.current + dx;
-    const overshoot = raw > 0 ? raw : raw < minX.current ? raw - minX.current : 0;
+    const overshoot = raw > maxX.current ? raw - maxX.current : raw < minX.current ? raw - minX.current : 0;
     x.current = raw - overshoot + overshoot * RUBBER_BAND;
 
     const now = performance.now();
@@ -158,6 +156,11 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     onSelect(albumId);
   };
 
+  const handlePlay = (albumId: string) => {
+    if (dragMoved.current) return;
+    onPlay(albumId);
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowRight") velocity.current = -6;
     else if (e.key === "ArrowLeft") velocity.current = 6;
@@ -169,8 +172,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       role="group"
       aria-label="Album library, scroll to browse"
       tabIndex={0}
-      className="absolute inset-x-0 top-0 bottom-[-277px] cursor-grab overflow-hidden touch-pan-y outline-none active:cursor-grabbing"
-      style={{ perspective: 2200 }}
+      className="absolute inset-0 cursor-grab overflow-hidden touch-pan-y outline-none active:cursor-grabbing"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
@@ -178,25 +180,37 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       onPointerCancel={endDrag}
       onKeyDown={onKeyDown}
     >
+      {/* Flat metadata overlay — translates with the row but never rotates or scales. */}
       <div
-        ref={trackRef}
-        className="flex h-full items-end will-change-transform"
-        style={{ paddingLeft: EDGE_PADDING, gap: CARD_GAP }}
+        ref={metaTrackRef}
+        className="absolute left-0 flex w-full will-change-transform"
+        style={{ bottom: `calc(${(1 - SLEEVE_TOP_VH) * 100}% + ${GAP_ABOVE_SLEEVE}px)` }}
       >
-        {albums.map((album, i) => (
-          <AlbumCard
-            key={album.id}
-            album={album}
-            onSelect={handleSelect}
-            onPlay={onPlay}
-            slotRef={(el) => {
-              slotRefs.current[i] = el;
-            }}
-            coverRef={(el) => {
-              coverRefs.current[i] = el;
-            }}
-          />
+        {albums.map((album) => (
+          <AlbumMeta key={album.id} album={album} onSelect={handleSelect} onPlay={handlePlay} />
         ))}
+      </div>
+
+      {/* Stationary perspective scene — only the track inside it translates along X. */}
+      <div
+        className="absolute left-0 w-full"
+        style={{
+          top: `${SLEEVE_TOP_VH * 100}%`,
+          height: SLEEVE_SIZE,
+          perspective: PERSPECTIVE,
+          perspectiveOrigin: "50% 0%",
+          transformStyle: "preserve-3d",
+        }}
+      >
+        <div
+          ref={trackRef}
+          className="absolute inset-0 flex items-start will-change-transform"
+          style={{ transformStyle: "preserve-3d" }}
+        >
+          {albums.map((album) => (
+            <AlbumSleeve key={album.id} album={album} size={SLEEVE_SIZE} onSelect={handleSelect} />
+          ))}
+        </div>
       </div>
     </div>
   );
