@@ -15,7 +15,7 @@ export function FocusedAlbum({ album, onBack }: FocusedAlbumProps) {
 
   return (
     <div className="absolute inset-0 flex items-center justify-center gap-16 overflow-hidden pb-16">
-      <VinylMark size={512} spinning={Boolean(isThisAlbumPlaying && isAudioPlaying)} flat={!track} />
+      <VinylMark size={512} spinning={Boolean(isThisAlbumPlaying && isAudioPlaying)} />
       <div className="flex flex-col items-start justify-center gap-2.5">
         <div className="flex items-start pb-4">
           <div className="flex items-center gap-4">
