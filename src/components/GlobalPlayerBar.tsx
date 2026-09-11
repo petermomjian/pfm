@@ -26,7 +26,7 @@ export function GlobalPlayerBar() {
             aria-label="Previous track"
             onClick={prev}
             disabled={!track}
-            className="flex size-20 items-center justify-center rounded-full text-foreground disabled:opacity-30"
+            className="flex size-20 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
           >
             <SkipBack size={24} />
           </button>
@@ -35,8 +35,7 @@ export function GlobalPlayerBar() {
             aria-label={isPlaying ? "Pause" : "Play"}
             onClick={togglePlay}
             disabled={!track}
-            className="flex size-20 items-center justify-center rounded-full border disabled:opacity-30"
-            style={{ borderColor: "var(--border-input)" }}
+            className="flex size-20 items-center justify-center rounded-full border border-[var(--border-input)] transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:border-[var(--surface-border)] focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
           >
             {isPlaying ? <Pause size={24} /> : <Play size={24} />}
           </button>
@@ -45,7 +44,7 @@ export function GlobalPlayerBar() {
             aria-label="Next track"
             onClick={next}
             disabled={!track}
-            className="flex size-20 items-center justify-center rounded-full text-foreground disabled:opacity-30"
+            className="flex size-20 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
           >
             <SkipForward size={24} />
           </button>
