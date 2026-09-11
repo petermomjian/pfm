@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { albums } from "@/data/albums";
 import { AlbumSleeve, AlbumMeta, SPINE_WIDTH } from "./AlbumCard";
 
@@ -13,9 +13,16 @@ const SLEEVE_SIZE = 768; // px — square face depth/height, and the perspective
 const GAP_ABOVE_SLEEVE = 54; // px between the metadata block and the sleeve top
 const PERSPECTIVE = 1200; // shared stationary camera depth
 const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
-const RUBBER_BAND = 0.35; // resistance applied when dragging past the scroll bounds
 const CLICK_DRAG_THRESHOLD = 6; // px of pointer movement before a click becomes a drag
 const WHEEL_LINE_HEIGHT = 16; // px per "line" when a wheel event reports deltaMode 1
+const WHEEL_VELOCITY_SCALE = 0.0037; // converts a wheel event's px delta into a velocity kick
+
+// The row loops infinitely: the album list is rendered REPEAT_COUNT times back
+// to back, and the scroll position silently wraps by one full cycle (the width
+// of one album list) whenever it drifts past half a cycle from center. Because
+// every copy is identical, the wrap is invisible — with 3 copies there's always
+// a full spare cycle of rendered content on either side of the visible window.
+const REPEAT_COUNT = 3;
 
 export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -25,8 +32,8 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const spacing = useRef(SLEEVE_SIZE * SPACING_VW);
   const x = useRef(0);
   const velocity = useRef(0);
-  const minX = useRef(0);
-  const maxX = useRef(0);
+  const baseX = useRef(0); // translateX that centers the middle copy's first spine
+  const cycleWidth = useRef(0); // px spanned by one full pass through the album list
   const initialized = useRef(false);
   const dragging = useRef(false);
   const dragStartClientX = useRef(0);
@@ -35,7 +42,13 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const lastPointerX = useRef(0);
   const lastPointerTime = useRef(0);
 
-  const clampTarget = (value: number) => Math.min(maxX.current, Math.max(minX.current, value));
+  const repeatedAlbums = useMemo(
+    () =>
+      Array.from({ length: REPEAT_COUNT }, (_, copy) =>
+        albums.map((album) => ({ album, key: `${album.id}-${copy}` }))
+      ).flat(),
+    []
+  );
 
   useEffect(() => {
     const measure = () => {
@@ -43,6 +56,9 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       const track = trackRef.current;
       const metaTrack = metaTrackRef.current;
       if (!viewport || !track || !metaTrack) return;
+
+      const oldSpacing = spacing.current;
+      const oldBaseX = baseX.current;
 
       const spacingPx = window.innerWidth * SPACING_VW;
       spacing.current = spacingPx;
@@ -52,16 +68,22 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       metaTrack.style.setProperty("--slot-width", `${spacingPx}px`);
 
       const centerX = viewport.clientWidth / 2;
-      const lastIndex = albums.length - 1;
-      maxX.current = centerX; // spine 0 can reach screen center
-      minX.current = centerX - lastIndex * spacingPx; // last spine can reach screen center
+      const cycle = albums.length * spacingPx;
+      const newBaseX = centerX - cycle; // middle copy's spine 0 can reach screen center
 
       if (!initialized.current) {
-        x.current = maxX.current; // open with the first album centered
+        x.current = newBaseX; // open with the first album centered
         initialized.current = true;
+      } else if (oldSpacing) {
+        // Preserve which album (fractionally) is centered across the resize.
+        const albumUnits = (x.current - oldBaseX) / oldSpacing;
+        x.current = newBaseX + albumUnits * spacingPx;
       } else {
-        x.current = clampTarget(x.current);
+        x.current = newBaseX;
       }
+
+      cycleWidth.current = cycle;
+      baseX.current = newBaseX;
     };
     measure();
     window.addEventListener("resize", measure);
@@ -72,26 +94,33 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     let frame: number;
     let lastTime = performance.now();
 
+    // Keeps x.current within half a cycle of baseX. Since every copy of the
+    // album list is identical, shifting by exactly one cycle is imperceptible
+    // — this is what makes the row loop seamlessly in both directions.
+    const wrap = () => {
+      const cycle = cycleWidth.current;
+      if (!cycle) return;
+      while (x.current - baseX.current > cycle / 2) {
+        x.current -= cycle;
+        if (dragging.current) dragStartX.current -= cycle;
+      }
+      while (x.current - baseX.current < -cycle / 2) {
+        x.current += cycle;
+        if (dragging.current) dragStartX.current += cycle;
+      }
+    };
+
     const tick = (time: number) => {
       const dt = Math.max(1, Math.min(48, time - lastTime));
       lastTime = time;
 
-      if (!dragging.current) {
-        if (x.current > maxX.current || x.current < minX.current) {
-          const target = x.current > maxX.current ? maxX.current : minX.current;
-          x.current += (target - x.current) * 0.22;
-          velocity.current = 0;
-        } else {
-          x.current += velocity.current * dt;
-          velocity.current *= MOMENTUM_DECAY;
-          if (Math.abs(velocity.current) < 0.001) velocity.current = 0;
-          const clamped = clampTarget(x.current);
-          if (clamped !== x.current) {
-            x.current = clamped;
-            velocity.current = 0;
-          }
-        }
+      if (!dragging.current && velocity.current !== 0) {
+        x.current += velocity.current * dt;
+        velocity.current *= MOMENTUM_DECAY;
+        if (Math.abs(velocity.current) < 0.001) velocity.current = 0;
       }
+
+      wrap();
 
       const track = trackRef.current;
       const metaTrack = metaTrackRef.current;
@@ -113,8 +142,10 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       e.preventDefault();
       const scale = e.deltaMode === 1 ? WHEEL_LINE_HEIGHT : e.deltaMode === 2 ? window.innerHeight : 1;
       const delta = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * scale;
-      const atBound = (x.current >= maxX.current && delta < 0) || (x.current <= minX.current && delta > 0);
-      x.current += atBound ? -delta * RUBBER_BAND * 0.3 : -delta;
+      // A kick into the existing momentum system, not a direct position jump —
+      // this is what smooths out the harsh per-notch step of a standard mouse
+      // wheel into eased motion, matching drag-release momentum.
+      velocity.current += -delta * WHEEL_VELOCITY_SCALE;
     };
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
@@ -136,9 +167,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     const dx = e.clientX - dragStartClientX.current;
     if (Math.abs(dx) > CLICK_DRAG_THRESHOLD) dragMoved.current = true;
 
-    const raw = dragStartX.current + dx;
-    const overshoot = raw > maxX.current ? raw - maxX.current : raw < minX.current ? raw - minX.current : 0;
-    x.current = raw - overshoot + overshoot * RUBBER_BAND;
+    x.current = dragStartX.current + dx;
 
     const now = performance.now();
     const dt = Math.max(1, now - lastPointerTime.current);
@@ -186,8 +215,8 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
         className="absolute left-0 flex w-full will-change-transform"
         style={{ bottom: `calc(${(1 - SLEEVE_TOP_VH) * 100}% + ${GAP_ABOVE_SLEEVE}px)` }}
       >
-        {albums.map((album) => (
-          <AlbumMeta key={album.id} album={album} onSelect={handleSelect} onPlay={handlePlay} />
+        {repeatedAlbums.map(({ album, key }) => (
+          <AlbumMeta key={key} album={album} onSelect={handleSelect} onPlay={handlePlay} />
         ))}
       </div>
 
@@ -207,8 +236,8 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
           className="absolute inset-0 flex items-start will-change-transform"
           style={{ transformStyle: "preserve-3d" }}
         >
-          {albums.map((album) => (
-            <AlbumSleeve key={album.id} album={album} size={SLEEVE_SIZE} onSelect={handleSelect} />
+          {repeatedAlbums.map(({ album, key }) => (
+            <AlbumSleeve key={key} album={album} size={SLEEVE_SIZE} onSelect={handleSelect} />
           ))}
         </div>
       </div>
