@@ -1,12 +1,19 @@
-import { Volume2 } from "lucide-react";
 import { usePlayer } from "@/player/PlayerContext";
 import { Slider } from "./Slider";
 import { VinylMark } from "./VinylMark";
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "./icons/TransportIcons";
-import { MuteIcon } from "./icons/VolumeIcons";
+import { MuteIcon, VolumeIcon, VolumeLowIcon, VolumeMinIcon } from "./icons/VolumeIcons";
 
 export function GlobalPlayerBar() {
   const { track, isPlaying, volume, isMuted, togglePlay, next, prev, setVolume, toggleMute } = usePlayer();
+
+  const VolumeGlyph = isMuted
+    ? MuteIcon
+    : volume >= 2 / 3
+      ? VolumeIcon
+      : volume >= 1 / 3
+        ? VolumeLowIcon
+        : VolumeMinIcon;
 
   return (
     <div className="flex w-full items-center justify-between pointer-events-auto">
@@ -15,12 +22,12 @@ export function GlobalPlayerBar() {
           type="button"
           aria-label={isMuted ? "Unmute" : "Mute"}
           onClick={toggleMute}
-          className="flex size-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
         >
-          {isMuted ? <MuteIcon size={16} /> : <Volume2 size={16} />}
+          <VolumeGlyph size={16} />
         </button>
         <Slider
-          value={isMuted ? 0 : volume}
+          value={volume}
           max={1}
           onChange={setVolume}
           width={128}
