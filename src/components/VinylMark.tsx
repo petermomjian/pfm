@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 interface VinylMarkProps {
   size: number;
   spinning?: boolean;
@@ -9,6 +11,91 @@ interface VinylMarkProps {
 const ASSET_BASE = "/vinyl";
 const BASE_SIZE = 512;
 const ROTATION_SECONDS = 1.8; // 33 RPM
+const FULL_SPEED_DEG_PER_MS = 360 / (ROTATION_SECONDS * 1000);
+const SPIN_TRANSITION_MS = 600; // medium-length spin-up/spin-down
+
+const easeInCubic = (t: number) => t * t * t;
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+
+type SpinPhase = "idle" | "accelerating" | "steady" | "decelerating";
+
+// Drives the platter's rotation with a real angular velocity instead of
+// toggling a linear CSS animation's play state, so starting playback eases
+// the spin up to speed and stopping eases it down to a halt rather than
+// snapping instantly.
+function useVinylRotation(spinning: boolean) {
+  const textureRef = useRef<HTMLImageElement | null>(null);
+  const artworkRef = useRef<HTMLDivElement | null>(null);
+  const angleRef = useRef(0);
+  const velocityRef = useRef(0); // deg/ms
+  const phaseRef = useRef<SpinPhase>("idle");
+  const phaseStartRef = useRef(0);
+  const phaseStartVelocityRef = useRef(0);
+
+  // Retargets the phase whenever playback state changes; the actual stepping
+  // happens in the persistent loop below, which keeps running the whole time
+  // this component is mounted.
+  useEffect(() => {
+    phaseStartVelocityRef.current = velocityRef.current;
+    phaseStartRef.current = performance.now();
+
+    if (spinning) {
+      phaseRef.current = "accelerating";
+    } else if (velocityRef.current > 0 || phaseRef.current !== "idle") {
+      phaseRef.current = "decelerating";
+    } else {
+      phaseRef.current = "idle";
+    }
+  }, [spinning]);
+
+  // A single rAF loop for the component's lifetime — avoids coordinating
+  // start/stop across renders (and the StrictMode double-invoke pitfall of
+  // an id ref left stale after a simulated mount/cleanup/remount).
+  useEffect(() => {
+    let rafId: number;
+    let lastFrame: number | null = null;
+
+    function step(frameTime: number) {
+      const last = lastFrame ?? frameTime;
+      const dt = Math.min(frameTime - last, 50);
+      lastFrame = frameTime;
+
+      const phase = phaseRef.current;
+      const elapsed = frameTime - phaseStartRef.current;
+
+      if (phase === "accelerating") {
+        if (elapsed >= SPIN_TRANSITION_MS) {
+          velocityRef.current = FULL_SPEED_DEG_PER_MS;
+          phaseRef.current = "steady";
+        } else {
+          velocityRef.current = FULL_SPEED_DEG_PER_MS * easeInCubic(elapsed / SPIN_TRANSITION_MS);
+        }
+      } else if (phase === "decelerating") {
+        if (elapsed >= SPIN_TRANSITION_MS) {
+          velocityRef.current = 0;
+          phaseRef.current = "idle";
+        } else {
+          velocityRef.current =
+            phaseStartVelocityRef.current * (1 - easeOutCubic(elapsed / SPIN_TRANSITION_MS));
+        }
+      }
+
+      if (velocityRef.current !== 0) {
+        angleRef.current = (angleRef.current + velocityRef.current * dt) % 360;
+        const transform = `rotate(${angleRef.current}deg)`;
+        if (textureRef.current) textureRef.current.style.transform = transform;
+        if (artworkRef.current) artworkRef.current.style.transform = transform;
+      }
+
+      rafId = requestAnimationFrame(step);
+    }
+
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  return { textureRef, artworkRef };
+}
 
 // Plain placeholder disc shown when there's no track loaded — the detailed
 // Figma vinyl implies a record is actually on the platter, so an idle player
@@ -66,6 +153,7 @@ export function VinylMark({
   className,
 }: VinylMarkProps) {
   const scale = size / BASE_SIZE;
+  const { textureRef, artworkRef } = useVinylRotation(spinning);
 
   if (flat) {
     return <FlatVinylMark size={size} className={className} />;
@@ -134,21 +222,15 @@ export function VinylMark({
         <div className="absolute left-[11px] top-[11px] size-[490px]">
           <div className="absolute left-0 top-0 size-[490px] overflow-clip rounded-[99999px] border border-[var(--surface)]">
             <img
+              ref={textureRef}
               alt=""
               className="pointer-events-none absolute inset-0 size-full max-w-none object-cover mix-blend-overlay"
-              style={{
-                animation: `vinyl-spin ${ROTATION_SECONDS}s linear infinite`,
-                animationPlayState: spinning ? "running" : "paused",
-              }}
               src={`${ASSET_BASE}/texture.png`}
             />
           </div>
           <div
+            ref={artworkRef}
             className="absolute left-[165px] top-[165px] size-[160px] overflow-clip rounded-[999px]"
-            style={{
-              animation: `vinyl-spin ${ROTATION_SECONDS}s linear infinite`,
-              animationPlayState: spinning ? "running" : "paused",
-            }}
           >
             <img alt="" className="absolute inset-0 size-full max-w-none object-cover" src={artworkSrc} />
             <div className="absolute inset-0 rounded-[inherit] shadow-[inset_0px_2px_4px_0px_rgba(255,255,255,0.25),inset_0px_-2px_4px_0px_rgba(0,0,0,0.25)]" />

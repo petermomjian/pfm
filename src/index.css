@@ -31,15 +31,6 @@ body {
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-@keyframes vinyl-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Shared easing for hover/active/focus interaction states across components. */
 .pfm-interactive {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform;

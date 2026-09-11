@@ -51,6 +51,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const previousVolumeRef = useRef(0.8);
   const isMuted = volume === 0;
 
+  // Set whenever one track hands off to another (auto-advance, Next/Prev, or
+  // picking a different track) while the platter was already spinning, so
+  // the transient pause/waiting/stalled events that swapping `src` produces
+  // don't read as a real stop. Only genuine play/pause from the transport
+  // controls should be visible as a ramp up/down.
+  const isAdvancingRef = useRef(false);
+
   useEffect(() => {
     const audio = new Audio();
     audio.volume = volume;
@@ -59,11 +66,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
     const onEnded = () => {
-      setIsAudioPlaying(false);
+      if (hasNextTrackRef.current) {
+        isAdvancingRef.current = true;
+      } else {
+        setIsAudioPlaying(false);
+      }
       nextRef.current();
     };
-    const onPlaying = () => setIsAudioPlaying(true);
-    const onFrozen = () => setIsAudioPlaying(false);
+    const onPlaying = () => {
+      isAdvancingRef.current = false;
+      setIsAudioPlaying(true);
+    };
+    const onFrozen = () => {
+      // A track finishing naturally fires `pause` (with `ended` already true)
+      // before the `ended` event itself, i.e. before onEnded below has had a
+      // chance to raise isAdvancingRef — check the same "about to auto-
+      // advance" condition here too, or this pause reads as a real stop.
+      if (isAdvancingRef.current) return;
+      if (audio.ended && hasNextTrackRef.current) return;
+      setIsAudioPlaying(false);
+    };
+    const onError = () => {
+      isAdvancingRef.current = false;
+      setIsAudioPlaying(false);
+    };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
@@ -72,7 +98,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("pause", onFrozen);
     audio.addEventListener("waiting", onFrozen);
     audio.addEventListener("stalled", onFrozen);
-    audio.addEventListener("error", onFrozen);
+    audio.addEventListener("error", onError);
 
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
@@ -82,7 +108,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("pause", onFrozen);
       audio.removeEventListener("waiting", onFrozen);
       audio.removeEventListener("stalled", onFrozen);
-      audio.removeEventListener("error", onFrozen);
+      audio.removeEventListener("error", onError);
       audio.pause();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,12 +116,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const playTrack = useCallback((albumId: string, trackId: string) => {
     const { album: nextAlbum, track: nextTrack } = findTrack(albumId, trackId);
-    if (!nextAlbum || !nextTrack || !audioRef.current) return;
+    const audio = audioRef.current;
+    if (!nextAlbum || !nextTrack || !audio) return;
+    if (!audio.paused) isAdvancingRef.current = true;
     setAlbum(nextAlbum);
     setTrack(nextTrack);
-    audioRef.current.src = nextTrack.src;
-    audioRef.current.currentTime = 0;
-    audioRef.current.play();
+    audio.src = nextTrack.src;
+    audio.currentTime = 0;
+    audio.play();
     setIsPlaying(true);
   }, []);
 
@@ -131,6 +159,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     nextRef.current = next;
   }, [next]);
+
+  const hasNextTrackRef = useRef(false);
+  useEffect(() => {
+    hasNextTrackRef.current = Boolean(
+      album && track && album.tracks.findIndex((t) => t.id === track.id) < album.tracks.length - 1,
+    );
+  }, [album, track]);
 
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
