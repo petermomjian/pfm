@@ -14,6 +14,7 @@ interface PlayerState {
   album: Album | null;
   track: Track | null;
   isPlaying: boolean;
+  isAudioPlaying: boolean;
   currentTime: number;
   duration: number;
   volume: number;
@@ -43,6 +44,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [album, setAlbum] = useState<Album | null>(null);
   const [track, setTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
@@ -56,16 +58,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
-    const onEnded = () => nextRef.current();
+    const onEnded = () => {
+      setIsAudioPlaying(false);
+      nextRef.current();
+    };
+    const onPlaying = () => setIsAudioPlaying(true);
+    const onFrozen = () => setIsAudioPlaying(false);
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("pause", onFrozen);
+    audio.addEventListener("waiting", onFrozen);
+    audio.addEventListener("stalled", onFrozen);
+    audio.addEventListener("error", onFrozen);
 
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("pause", onFrozen);
+      audio.removeEventListener("waiting", onFrozen);
+      audio.removeEventListener("stalled", onFrozen);
+      audio.removeEventListener("error", onFrozen);
       audio.pause();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,6 +160,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       album,
       track,
       isPlaying,
+      isAudioPlaying,
       currentTime,
       duration,
       volume,
@@ -159,6 +177,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       album,
       track,
       isPlaying,
+      isAudioPlaying,
       currentTime,
       duration,
       volume,
