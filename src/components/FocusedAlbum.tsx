@@ -18,12 +18,12 @@ export function FocusedAlbum({ album, onBack }: FocusedAlbumProps) {
       <VinylMark size={512} spinning={Boolean(isThisAlbumPlaying && isPlaying)} />
       <div className="flex flex-col items-start justify-center gap-2.5">
         <div className="flex items-start pb-4">
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-4">
             <button
               type="button"
               aria-label="Back to library"
               onClick={onBack}
-              className="flex size-8 -translate-x-3 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
+              className="flex size-9 -translate-x-3.5 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
             >
               <ArrowLeft size={16} />
             </button>
