@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
-import { Play } from "lucide-react";
+import { Pause, Play } from "lucide-react";
 import type { Album } from "@/data/albums";
+import { usePlayer } from "@/player/PlayerContext";
+import { IconSwap } from "./icons/IconSwap";
 
 // Visible thickness of the sleeve's front edge — the part of every sleeve
 // that stays on-screen even when its face has rotated edge-on at center.
@@ -62,6 +64,10 @@ interface AlbumMetaProps {
 }
 
 export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
+  const { track, isPlaying, togglePlay } = usePlayer();
+  const isThisAlbumActive = Boolean(track && album.tracks.some((t) => t.id === track.id));
+  const isThisAlbumPlaying = isThisAlbumActive && isPlaying;
+
   return (
     <div className="relative shrink-0" style={{ width: SPINE_WIDTH }}>
       <div
@@ -75,14 +81,20 @@ export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
         </div>
         <button
           type="button"
-          aria-label={`Play ${album.title}`}
+          aria-label={isThisAlbumPlaying ? `Pause ${album.title}` : `Play ${album.title}`}
           onClick={(e) => {
             e.stopPropagation();
-            onPlay(album.id);
+            if (isThisAlbumActive) {
+              togglePlay();
+            } else {
+              onPlay(album.id);
+            }
           }}
           className="pfm-interactive flex size-9 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
         >
-          <Play size={16} fill="currentColor" />
+          <IconSwap id={isThisAlbumPlaying ? "pause" : "play"} size={16} scale={0.4} blur={10}>
+            {isThisAlbumPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+          </IconSwap>
         </button>
       </div>
     </div>

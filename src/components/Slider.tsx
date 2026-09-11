@@ -12,7 +12,7 @@ export function Slider({ value, max, onChange, width = 128, dimmed = false, ...a
 
   return (
     <div
-      className="relative flex items-center py-1"
+      className="pfm-interactive relative flex items-center py-1"
       style={{ width, opacity: dimmed ? 0.5 : 1 }}
     >
       <div className="h-1 w-full rounded-full" style={{ backgroundColor: "var(--border-input)" }}>

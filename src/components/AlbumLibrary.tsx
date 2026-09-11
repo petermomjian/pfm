@@ -201,13 +201,14 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       role="group"
       aria-label="Album library, scroll to browse"
       tabIndex={0}
-      className="absolute inset-0 cursor-grab overflow-hidden touch-pan-y outline-none active:cursor-grabbing"
+      className="absolute inset-0 cursor-grab overflow-hidden touch-pan-y outline-none select-none active:cursor-grabbing"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerLeave={endDrag}
       onPointerCancel={endDrag}
       onKeyDown={onKeyDown}
+      onDragStart={(e) => e.preventDefault()}
     >
       {/* Flat metadata overlay — translates with the row but never rotates or scales. */}
       <div
