@@ -5,9 +5,10 @@ interface AlbumCardProps {
   album: Album;
   onSelect: (albumId: string) => void;
   onPlay: (albumId: string) => void;
+  coverRef?: (el: HTMLDivElement | null) => void;
 }
 
-export function AlbumCard({ album, onSelect, onPlay }: AlbumCardProps) {
+export function AlbumCard({ album, onSelect, onPlay, coverRef }: AlbumCardProps) {
   return (
     <div
       className="flex w-[214px] shrink-0 flex-col items-start gap-[54px] cursor-pointer"
@@ -31,9 +32,23 @@ export function AlbumCard({ album, onSelect, onPlay }: AlbumCardProps) {
         </button>
       </div>
       <div
-        className="h-[768px] w-full border"
-        style={{ backgroundColor: "var(--surface)", borderColor: "var(--surface-border)" }}
-      />
+        ref={coverRef}
+        className="relative h-[768px] w-full border"
+        style={{
+          backgroundColor: "var(--surface)",
+          borderColor: "var(--surface-border)",
+          transformStyle: "preserve-3d",
+          backfaceVisibility: "hidden",
+        }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(0,0,0,0.55), rgba(0,0,0,0) 16%, rgba(0,0,0,0) 84%, rgba(0,0,0,0.55))",
+          }}
+        />
+      </div>
     </div>
   );
 }
