@@ -9,8 +9,10 @@ interface AlbumLibraryProps {
 
 const EDGE_PADDING = 64; // matches the px-16 inset used by Header / GlobalPlayerBar
 const CARD_GAP = 8; // constant gap between panels, independent of their rotation
-const MAX_ANGLE = 52; // degrees a panel reaches once it's fully receded to the side
-const FALLOFF_CARDS = 2.6; // how many card-widths from center it takes to reach MAX_ANGLE
+const PERSPECTIVE = 1600; // shared camera depth for the whole row
+const MAX_ANGLE = 80; // degrees a panel reaches at dead center — nearly edge-on, like a record being flipped past
+const MAX_Z = 90; // px the center panel is pulled toward the camera
+const FALLOFF_CARDS = 1.3; // how many card-widths from center it takes to unwind back to flat
 const ANGLE_EASE = 0.28; // per-frame lerp toward the target angle, for a smooth settle
 const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
 const RUBBER_BAND = 0.35; // resistance applied when dragging past the scroll bounds
@@ -21,7 +23,9 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const coverRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const shadeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cardAngles = useRef<number[]>(albums.map(() => 0));
+  const perspectiveOriginY = useRef(0);
 
   const x = useRef(0);
   const velocity = useRef(0);
@@ -42,6 +46,16 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       if (!viewport || !track) return;
       minX.current = Math.min(0, viewport.clientWidth - track.scrollWidth - EDGE_PADDING);
       x.current = clampTarget(x.current);
+
+      // Align the shared camera's vanishing point with the top edge of the
+      // cards so that edge stays level across the row regardless of a
+      // panel's rotation — only the bottom recedes, per the Figma reference.
+      const slot = slotRefs.current[0];
+      if (slot) {
+        const originY = slot.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+        perspectiveOriginY.current = originY;
+        viewport.style.perspectiveOrigin = `50% ${originY}px`;
+      }
     };
     measure();
     window.addEventListener("resize", measure);
@@ -84,20 +98,41 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
 
         slotRefs.current.forEach((slot, i) => {
           const cover = coverRefs.current[i];
+          const shade = shadeRefs.current[i];
           if (!slot || !cover) return;
           const rect = slot.getBoundingClientRect();
           const cardCenter = rect.left + rect.width / 2;
           const signedDistance = cardCenter - viewportCenter;
-          const normalized = Math.max(-1, Math.min(1, signedDistance / falloff));
-          const target = normalized * MAX_ANGLE;
+          const target = Math.max(-1, Math.min(1, signedDistance / falloff));
 
           const current = cardAngles.current[i] + (target - cardAngles.current[i]) * ANGLE_EASE;
           cardAngles.current[i] = current;
 
-          const depth = -Math.abs(current) * 2.2;
-          const shade = 1 - Math.min(0.4, Math.abs(current) / MAX_ANGLE) * 0.4;
-          cover.style.transform = `rotateY(${current}deg) translateZ(${depth}px)`;
-          cover.style.filter = `brightness(${shade})`;
+          // Panels are nearly edge-on at the center (like a record being
+          // flipped past) and unwind toward flat as they recede to either
+          // side — the inverse of a typical coverflow. Rotation pivots from
+          // the top edge, which (combined with the matched perspective
+          // origin) keeps that edge level while only the bottom sweeps.
+          const distanceRatio = Math.min(1, Math.abs(current));
+          const centeredness = 1 - distanceRatio;
+          // Ease the unwind so the crease is sharp right at center and
+          // flares out gradually, instead of unwinding at a constant rate.
+          const eased = centeredness * centeredness * (3 - 2 * centeredness);
+          const direction = current === 0 ? 1 : Math.sign(current);
+          const angle = direction * eased * MAX_ANGLE;
+          const z = eased * MAX_Z;
+          cover.style.transform = `rotateY(${angle}deg) translateZ(${z}px)`;
+
+          // Light rakes down the fold from whichever edge is turned toward
+          // the camera; that edge flips with rotation direction, and the
+          // grazing angle sharpens (higher contrast) as a panel goes more
+          // edge-on, mimicking a rim light rather than a flat dim.
+          if (shade) {
+            const bright = `rgba(255,255,255,${(0.08 + eased * 0.32).toFixed(3)})`;
+            const dark = `rgba(0,0,0,${(0.12 + eased * 0.5).toFixed(3)})`;
+            const stops = angle >= 0 ? `${bright}, ${dark}` : `${dark}, ${bright}`;
+            shade.style.background = `linear-gradient(90deg, ${stops})`;
+          }
         });
       }
 
@@ -170,7 +205,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       aria-label="Album library, scroll to browse"
       tabIndex={0}
       className="absolute inset-x-0 top-0 bottom-[-277px] cursor-grab overflow-hidden touch-pan-y outline-none active:cursor-grabbing"
-      style={{ perspective: 2200 }}
+      style={{ perspective: PERSPECTIVE }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
@@ -181,7 +216,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       <div
         ref={trackRef}
         className="flex h-full items-end will-change-transform"
-        style={{ paddingLeft: EDGE_PADDING, gap: CARD_GAP }}
+        style={{ paddingLeft: EDGE_PADDING, gap: CARD_GAP, transformStyle: "preserve-3d" }}
       >
         {albums.map((album, i) => (
           <AlbumCard
@@ -194,6 +229,9 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
             }}
             coverRef={(el) => {
               coverRefs.current[i] = el;
+            }}
+            shadeRef={(el) => {
+              shadeRefs.current[i] = el;
             }}
           />
         ))}
