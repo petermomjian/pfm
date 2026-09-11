@@ -4,7 +4,15 @@ import type { Album } from "@/data/albums";
 
 // Visible thickness of the sleeve's front edge — the part of every sleeve
 // that stays on-screen even when its face has rotated edge-on at center.
-export const SPINE_WIDTH = 6;
+export const SPINE_WIDTH = 12;
+
+// Each face plane pivots from the spine (local x=0, z=0 — nearest the
+// viewer) and extends backward into -Z as local x grows toward `size`
+// (deepest, farthest from the viewer). The overlay tracks that same axis so
+// it always reads as transparent at the near edge, darkening toward the far
+// edge, matching the Figma depth-shading reference regardless of size.
+const ARTWORK_OVERLAY =
+  "linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,0) 100%)";
 
 interface AlbumSleeveProps {
   album: Album;
@@ -17,6 +25,7 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
     width: size,
     height: size,
     backgroundColor: "var(--surface)",
+    backgroundImage: ARTWORK_OVERLAY,
     borderColor: "var(--surface-border)",
     transformOrigin: "left top",
     backfaceVisibility: "hidden",
