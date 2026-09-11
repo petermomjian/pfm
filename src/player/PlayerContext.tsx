@@ -17,6 +17,7 @@ interface PlayerState {
   currentTime: number;
   duration: number;
   volume: number;
+  isMuted: boolean;
 }
 
 interface PlayerContextValue extends PlayerState {
@@ -26,6 +27,7 @@ interface PlayerContextValue extends PlayerState {
   prev: () => void;
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
+  toggleMute: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -44,6 +46,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
+  const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
     const audio = new Audio();
@@ -120,7 +123,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const setVolume = useCallback((next: number) => {
     if (!audioRef.current) return;
     audioRef.current.volume = next;
+    audioRef.current.muted = false;
     setVolumeState(next);
+    setIsMuted(false);
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.muted = !audio.muted;
+    setIsMuted(audio.muted);
   }, []);
 
   const value = useMemo<PlayerContextValue>(
@@ -131,14 +143,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTime,
       duration,
       volume,
+      isMuted,
       playTrack,
       togglePlay,
       next,
       prev,
       seek,
       setVolume,
+      toggleMute,
     }),
-    [album, track, isPlaying, currentTime, duration, volume, playTrack, togglePlay, next, prev, seek, setVolume],
+    [
+      album,
+      track,
+      isPlaying,
+      currentTime,
+      duration,
+      volume,
+      isMuted,
+      playTrack,
+      togglePlay,
+      next,
+      prev,
+      seek,
+      setVolume,
+      toggleMute,
+    ],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
