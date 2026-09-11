@@ -80,7 +80,7 @@ export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
             e.stopPropagation();
             onPlay(album.id);
           }}
-          className="flex size-8 items-center justify-center rounded-full text-foreground"
+          className="flex size-8 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
         >
           <Play size={16} fill="currentColor" />
         </button>
