@@ -8,10 +8,10 @@ interface AlbumLibraryProps {
 }
 
 const EDGE_PADDING = 64; // matches the px-16 inset used by Header / GlobalPlayerBar
-const MAX_ANGLE = 82; // degrees a card can rotate toward edge-on before clamping
-const RIPPLE_DELAY_MS = 55; // lag introduced per card index, oldest cards react first
-const VELOCITY_TO_ANGLE = 5.5; // deg per px/ms of (delayed) scroll velocity
-const ANGLE_EASE = 0.22; // per-frame lerp toward the target angle
+const CARD_GAP = 8; // constant gap between panels, independent of their rotation
+const MAX_ANGLE = 52; // degrees a panel reaches once it's fully receded to the side
+const FALLOFF_CARDS = 2.6; // how many card-widths from center it takes to reach MAX_ANGLE
+const ANGLE_EASE = 0.28; // per-frame lerp toward the target angle, for a smooth settle
 const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
 const RUBBER_BAND = 0.35; // resistance applied when dragging past the scroll bounds
 const CLICK_DRAG_THRESHOLD = 6; // px of pointer movement before a click becomes a drag
@@ -19,9 +19,9 @@ const CLICK_DRAG_THRESHOLD = 6; // px of pointer movement before a click becomes
 export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const coverRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cardAngles = useRef<number[]>(albums.map(() => 0));
-  const velocityHistory = useRef<number[]>(new Array(240).fill(0));
 
   const x = useRef(0);
   const velocity = useRef(0);
@@ -73,27 +73,33 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
         }
       }
 
-      const history = velocityHistory.current;
-      history.push(velocity.current);
-      history.shift();
-
       const track = trackRef.current;
+      const viewport = viewportRef.current;
       if (track) track.style.transform = `translateX(${x.current}px)`;
 
-      const delayFrames = RIPPLE_DELAY_MS / 16.7;
-      coverRefs.current.forEach((el, i) => {
-        if (!el) return;
-        const idx = Math.max(0, history.length - 1 - Math.round(i * delayFrames));
-        const delayedVelocity = history[idx] ?? 0;
-        const target = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, delayedVelocity * VELOCITY_TO_ANGLE));
-        const current = cardAngles.current[i] + (target - cardAngles.current[i]) * ANGLE_EASE;
-        cardAngles.current[i] = current;
+      if (viewport) {
+        const viewportRect = viewport.getBoundingClientRect();
+        const viewportCenter = viewportRect.left + viewportRect.width / 2;
+        const falloff = FALLOFF_CARDS * (slotRefs.current[0]?.getBoundingClientRect().width || 214);
 
-        const depth = -Math.abs(current) * 1.4;
-        const shade = 1 - Math.min(0.45, Math.abs(current) / MAX_ANGLE) * 0.45;
-        el.style.transform = `rotateY(${current}deg) translateZ(${depth}px)`;
-        el.style.filter = `brightness(${shade})`;
-      });
+        slotRefs.current.forEach((slot, i) => {
+          const cover = coverRefs.current[i];
+          if (!slot || !cover) return;
+          const rect = slot.getBoundingClientRect();
+          const cardCenter = rect.left + rect.width / 2;
+          const signedDistance = cardCenter - viewportCenter;
+          const normalized = Math.max(-1, Math.min(1, signedDistance / falloff));
+          const target = normalized * MAX_ANGLE;
+
+          const current = cardAngles.current[i] + (target - cardAngles.current[i]) * ANGLE_EASE;
+          cardAngles.current[i] = current;
+
+          const depth = -Math.abs(current) * 2.2;
+          const shade = 1 - Math.min(0.4, Math.abs(current) / MAX_ANGLE) * 0.4;
+          cover.style.transform = `rotateY(${current}deg) translateZ(${depth}px)`;
+          cover.style.filter = `brightness(${shade})`;
+        });
+      }
 
       frame = requestAnimationFrame(tick);
     };
@@ -175,7 +181,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       <div
         ref={trackRef}
         className="flex h-full items-end will-change-transform"
-        style={{ paddingLeft: EDGE_PADDING, transformStyle: "preserve-3d" }}
+        style={{ paddingLeft: EDGE_PADDING, gap: CARD_GAP }}
       >
         {albums.map((album, i) => (
           <AlbumCard
@@ -183,6 +189,9 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
             album={album}
             onSelect={handleSelect}
             onPlay={onPlay}
+            slotRef={(el) => {
+              slotRefs.current[i] = el;
+            }}
             coverRef={(el) => {
               coverRefs.current[i] = el;
             }}
