@@ -46,7 +46,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
-  const [isMuted, setIsMuted] = useState(false);
+  const previousVolumeRef = useRef(0.8);
+  const isMuted = volume === 0;
 
   useEffect(() => {
     const audio = new Audio();
@@ -123,17 +124,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const setVolume = useCallback((next: number) => {
     if (!audioRef.current) return;
     audioRef.current.volume = next;
-    audioRef.current.muted = false;
     setVolumeState(next);
-    setIsMuted(false);
+    if (next > 0) previousVolumeRef.current = next;
   }, []);
 
   const toggleMute = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.muted = !audio.muted;
-    setIsMuted(audio.muted);
-  }, []);
+    if (!audioRef.current) return;
+    if (volume > 0) {
+      previousVolumeRef.current = volume;
+      setVolume(0);
+    } else {
+      setVolume(previousVolumeRef.current || 0.8);
+    }
+  }, [volume, setVolume]);
 
   const value = useMemo<PlayerContextValue>(
     () => ({
