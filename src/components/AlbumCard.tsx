@@ -9,12 +9,14 @@ interface AlbumCardProps {
   onPlay: (albumId: string) => void;
   slotRef?: (el: HTMLDivElement | null) => void;
   coverRef?: (el: HTMLDivElement | null) => void;
+  shadeRef?: (el: HTMLDivElement | null) => void;
 }
 
-export function AlbumCard({ album, onSelect, onPlay, slotRef, coverRef }: AlbumCardProps) {
+export function AlbumCard({ album, onSelect, onPlay, slotRef, coverRef, shadeRef }: AlbumCardProps) {
   return (
     <div
       className="flex w-[214px] shrink-0 flex-col items-start gap-[54px] cursor-pointer"
+      style={{ transformStyle: "preserve-3d" }}
       onClick={() => onSelect(album.id)}
     >
       <div className="flex w-full flex-col items-start gap-[36px]">
@@ -34,16 +36,18 @@ export function AlbumCard({ album, onSelect, onPlay, slotRef, coverRef }: AlbumC
           <Play size={16} fill="currentColor" />
         </button>
       </div>
-      <div ref={slotRef} className="relative h-[768px] w-full" style={{ perspective: 1400 }}>
+      <div ref={slotRef} className="relative h-[768px] w-full" style={{ transformStyle: "preserve-3d" }}>
         <div
           ref={coverRef}
-          className="absolute inset-0 border"
+          className="absolute inset-0 border will-change-transform"
           style={{
             backgroundColor: "var(--surface)",
             borderColor: "var(--surface-border)",
+            transformOrigin: "center top",
           }}
         >
           <div
+            ref={shadeRef}
             className="pointer-events-none absolute inset-0"
             style={{
               background: "linear-gradient(90deg, rgba(255,255,255,0.14), rgba(0,0,0,0.35))",
