@@ -71,11 +71,11 @@ export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
   return (
     <div className="relative shrink-0" style={{ width: SPINE_WIDTH }}>
       <div
-        className="absolute bottom-0 left-0 flex flex-col items-start gap-[36px] cursor-pointer"
+        className="absolute bottom-0 left-0 flex -translate-x-3 flex-col items-start gap-[36px] cursor-pointer"
         style={{ width: "var(--slot-width)" }}
         onClick={() => onSelect(album.id)}
       >
-        <div className="flex w-full flex-col items-start gap-1.5 pr-8 text-xs">
+        <div className="pfm-interactive -m-3 flex w-full translate-x-3 flex-col items-start gap-1.5 rounded-[8px] p-3 text-xs hover:bg-[var(--surface)]">
           <p className="w-full text-foreground">{album.title}</p>
           <p className="w-full text-muted">{album.artist}</p>
         </div>

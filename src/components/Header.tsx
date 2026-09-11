@@ -1,9 +1,10 @@
 import { SITE_NAME } from "@/config";
+import { Logo } from "@/components/icons/Logo";
 
 export function Header() {
   return (
     <div className="flex w-full items-center justify-between pointer-events-auto">
-      <div className="text-sm">{SITE_NAME}</div>
+      <Logo height={32} role="img" aria-label={SITE_NAME} />
     </div>
   );
 }

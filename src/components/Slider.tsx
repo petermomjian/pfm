@@ -12,15 +12,9 @@ export function Slider({ value, max, onChange, width = 128, dimmed = false, ...a
 
   return (
     <div
-      className="pfm-interactive relative flex items-center py-1"
+      className="pfm-interactive relative flex h-3 items-center"
       style={{ width, opacity: dimmed ? 0.5 : 1 }}
     >
-      <div className="h-1 w-full rounded-full" style={{ backgroundColor: "var(--border-input)" }}>
-        <div
-          className="h-1 rounded-full"
-          style={{ width: `${percent}%`, backgroundColor: "var(--primary)" }}
-        />
-      </div>
       <input
         type="range"
         min={0}
@@ -33,15 +27,14 @@ export function Slider({ value, max, onChange, width = 128, dimmed = false, ...a
       />
       <div
         aria-hidden
-        className="pfm-interactive pointer-events-none absolute rounded-full border peer-hover:scale-110 peer-active:scale-110 peer-focus-visible:scale-110 peer-focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
+        className="pointer-events-none h-1 w-full rounded-full peer-hover:h-3 peer-active:h-3 peer-focus-visible:h-3"
         style={{
-          left: `calc(${percent}% - 12px)`,
-          width: 24,
-          height: 16,
-          backgroundColor: "#ffffff",
-          borderColor: "#e5e5e5",
+          backgroundColor: "var(--border-input)",
+          transition: "height 150ms var(--ease-out-subtle)",
         }}
-      />
+      >
+        <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: "var(--primary)" }} />
+      </div>
     </div>
   );
 }
