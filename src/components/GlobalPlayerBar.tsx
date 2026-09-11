@@ -3,21 +3,30 @@ import { usePlayer } from "@/player/PlayerContext";
 import { Slider } from "./Slider";
 import { VinylMark } from "./VinylMark";
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "./icons/TransportIcons";
+import { MuteIcon } from "./icons/VolumeIcons";
 
 export function GlobalPlayerBar() {
-  const { track, isPlaying, volume, togglePlay, next, prev, setVolume } = usePlayer();
+  const { track, isPlaying, volume, isMuted, togglePlay, next, prev, setVolume, toggleMute } = usePlayer();
 
   return (
     <div className="flex w-full items-center justify-between pointer-events-auto">
       <div className="flex flex-1 min-w-0 items-center gap-4">
         <button
           type="button"
-          aria-label="Volume"
-          className="flex size-8 shrink-0 items-center justify-center rounded-full text-foreground"
+          aria-label={isMuted ? "Unmute" : "Mute"}
+          onClick={toggleMute}
+          className="flex size-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors duration-150 hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
         >
-          <Volume2 size={16} />
+          {isMuted ? <MuteIcon size={16} /> : <Volume2 size={16} />}
         </button>
-        <Slider value={volume} max={1} onChange={setVolume} width={128} aria-label="Volume" />
+        <Slider
+          value={isMuted ? 0 : volume}
+          max={1}
+          onChange={setVolume}
+          width={128}
+          aria-label="Volume"
+          dimmed={isMuted}
+        />
       </div>
 
       <div className="flex flex-1 items-center justify-center">
