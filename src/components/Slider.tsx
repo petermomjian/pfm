@@ -3,14 +3,18 @@ interface SliderProps {
   max: number;
   onChange: (value: number) => void;
   width?: number;
+  dimmed?: boolean;
   "aria-label"?: string;
 }
 
-export function Slider({ value, max, onChange, width = 128, ...aria }: SliderProps) {
+export function Slider({ value, max, onChange, width = 128, dimmed = false, ...aria }: SliderProps) {
   const percent = max > 0 ? (value / max) * 100 : 0;
 
   return (
-    <div className="relative flex items-center py-1" style={{ width }}>
+    <div
+      className="relative flex items-center py-1"
+      style={{ width, opacity: dimmed ? 0.5 : 1 }}
+    >
       <div className="h-1 w-full rounded-full" style={{ backgroundColor: "var(--border-input)" }}>
         <div
           className="h-1 rounded-full"
