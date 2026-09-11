@@ -53,9 +53,15 @@ export function GlobalPlayerBar() {
       </div>
 
       <div className="flex flex-1 min-w-0 items-center justify-end gap-4">
-        <div className="flex flex-col items-start gap-0.5 text-sm w-28 min-w-0">
-          <span className="text-muted">Now Playing</span>
-          <span className="truncate w-full">{track ? track.title : "—"}</span>
+        <div className="flex flex-col items-start justify-center gap-0.5 text-sm w-28 min-w-0">
+          {track ? (
+            <>
+              <span className="text-muted">Now Playing</span>
+              <span className="truncate w-full">{track.title}</span>
+            </>
+          ) : (
+            <span className="text-muted">Nothing Playing</span>
+          )}
         </div>
         <VinylMark size={80} spinning={isPlaying} />
       </div>
