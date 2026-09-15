@@ -3,13 +3,13 @@ import { albums } from "@/data/albums";
 import { AlbumSleeve, AlbumMeta, SPINE_WIDTH } from "./AlbumCard";
 
 interface AlbumLibraryProps {
-  onSelect: (albumId: string) => void;
-  onPlay: (albumId: string) => void;
+  onSelect: (albumId: string, sleeveEl: HTMLDivElement | null) => void;
+  onPlay: (albumId: string, sleeveEl: HTMLDivElement | null) => void;
 }
 
 const SPACING_VW = 0.15; // spine-to-spine pitch, as a fraction of viewport width
-const SLEEVE_TOP_VH = 0.47; // sleeve top edge, as a fraction of viewport height — also the perspective's vertical vanishing point
-const SLEEVE_SIZE = 768; // px — square face depth/height, and the perspective scene's height
+export const SLEEVE_TOP_VH = 0.47; // sleeve top edge, as a fraction of viewport height — also the perspective's vertical vanishing point
+export const SLEEVE_SIZE = 768; // px — square face depth/height, and the perspective scene's height
 const GAP_ABOVE_SLEEVE = 54; // px between the metadata block and the sleeve top
 const PERSPECTIVE = 1200; // shared stationary camera depth
 const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
@@ -28,6 +28,17 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const metaTrackRef = useRef<HTMLDivElement | null>(null);
+  const sleeveRefs = useRef(new Map<string, HTMLDivElement>());
+
+  const registerSleeveRef = (cardKey: string, el: HTMLDivElement | null) => {
+    if (el) sleeveRefs.current.set(cardKey, el);
+    else sleeveRefs.current.delete(cardKey);
+  };
+
+  // Album ids never contain a trailing "-<digits>" segment themselves
+  // (see data/albums.ts), so stripping the repeated-copy suffix this way is
+  // unambiguous.
+  const albumIdFromCardKey = (cardKey: string) => cardKey.replace(/-\d+$/, "");
 
   const spacing = useRef(SLEEVE_SIZE * SPACING_VW);
   const x = useRef(0);
@@ -180,14 +191,14 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     dragging.current = false;
   };
 
-  const handleSelect = (albumId: string) => {
+  const handleSelect = (cardKey: string, sleeveEl?: HTMLDivElement) => {
     if (dragMoved.current) return;
-    onSelect(albumId);
+    onSelect(albumIdFromCardKey(cardKey), sleeveEl ?? sleeveRefs.current.get(cardKey) ?? null);
   };
 
-  const handlePlay = (albumId: string) => {
+  const handlePlay = (cardKey: string) => {
     if (dragMoved.current) return;
-    onPlay(albumId);
+    onPlay(albumIdFromCardKey(cardKey), sleeveRefs.current.get(cardKey) ?? null);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -217,7 +228,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
         style={{ bottom: `calc(${(1 - SLEEVE_TOP_VH) * 100}% + ${GAP_ABOVE_SLEEVE}px)` }}
       >
         {repeatedAlbums.map(({ album, key }) => (
-          <AlbumMeta key={key} album={album} onSelect={handleSelect} onPlay={handlePlay} />
+          <AlbumMeta key={key} album={album} cardKey={key} onSelect={handleSelect} onPlay={handlePlay} />
         ))}
       </div>
 
@@ -237,8 +248,14 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
           className="absolute inset-0 flex items-start will-change-transform"
           style={{ transformStyle: "preserve-3d" }}
         >
-          {repeatedAlbums.map(({ album, key }) => (
-            <AlbumSleeve key={key} album={album} size={SLEEVE_SIZE} onSelect={handleSelect} />
+          {repeatedAlbums.map(({ key }) => (
+            <AlbumSleeve
+              key={key}
+              size={SLEEVE_SIZE}
+              cardKey={key}
+              onSelect={handleSelect}
+              registerRef={registerSleeveRef}
+            />
           ))}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useRef, type Ref } from "react";
 
 interface VinylMarkProps {
   size: number;
@@ -100,9 +100,13 @@ function useVinylRotation(spinning: boolean) {
 // Plain placeholder disc shown when there's no track loaded — the detailed
 // Figma vinyl implies a record is actually on the platter, so an idle player
 // falls back to this flat mark instead.
-function FlatVinylMark({ size, className }: { size: number; className?: string }) {
+const FlatVinylMark = forwardRef(function FlatVinylMark(
+  { size, className }: { size: number; className?: string },
+  ref: Ref<HTMLDivElement>,
+) {
   return (
     <div
+      ref={ref}
       className={className}
       style={{
         width: size,
@@ -137,7 +141,7 @@ function FlatVinylMark({ size, className }: { size: number; className?: string }
       />
     </div>
   );
-}
+});
 
 // Matches the Figma "Vinyl Detail" component (node 10971:56109) 1:1: layer
 // order, dimensions, masks, opacity, and blend modes are reproduced exactly.
@@ -145,22 +149,25 @@ function FlatVinylMark({ size, className }: { size: number; className?: string }
 // Background, Surface, Ridges, and the two exclusion Highlights — is static.
 // The whole 512px composition is rendered at native scale and resized via a
 // single CSS transform so proportions stay exact at any requested `size`.
-export function VinylMark({
-  size,
-  spinning = false,
-  flat = false,
-  artworkSrc = `${ASSET_BASE}/cover-placeholder.png`,
-  className,
-}: VinylMarkProps) {
+export const VinylMark = forwardRef(function VinylMark(
+  {
+    size,
+    spinning = false,
+    flat = false,
+    artworkSrc = `${ASSET_BASE}/cover-placeholder.png`,
+    className,
+  }: VinylMarkProps,
+  ref: Ref<HTMLDivElement>,
+) {
   const scale = size / BASE_SIZE;
   const { textureRef, artworkRef } = useVinylRotation(spinning);
 
   if (flat) {
-    return <FlatVinylMark size={size} className={className} />;
+    return <FlatVinylMark ref={ref} size={size} className={className} />;
   }
 
   return (
-    <div className={className} style={{ width: size, height: size, position: "relative", flexShrink: 0 }}>
+    <div ref={ref} className={className} style={{ width: size, height: size, position: "relative", flexShrink: 0 }}>
       <div
         style={{
           position: "absolute",
@@ -248,4 +255,4 @@ export function VinylMark({
       </div>
     </div>
   );
-}
+});

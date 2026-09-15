@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { Album } from "@/data/albums";
 import { usePlayer } from "@/player/PlayerContext";
@@ -7,15 +8,16 @@ import { TrackRow } from "./TrackRow";
 interface FocusedAlbumProps {
   album: Album;
   onBack: () => void;
+  vinylRef?: RefObject<HTMLDivElement>;
 }
 
-export function FocusedAlbum({ album, onBack }: FocusedAlbumProps) {
+export function FocusedAlbum({ album, onBack, vinylRef }: FocusedAlbumProps) {
   const { track, isAudioPlaying, playTrack } = usePlayer();
   const isThisAlbumPlaying = track && album.tracks.some((t) => t.id === track.id);
 
   return (
     <div className="absolute inset-0 flex items-center justify-center gap-16 overflow-hidden pb-16">
-      <VinylMark size={512} spinning={Boolean(isThisAlbumPlaying && isAudioPlaying)} />
+      <VinylMark ref={vinylRef} size={512} spinning={Boolean(isThisAlbumPlaying && isAudioPlaying)} />
       <div className="flex flex-col items-start justify-center gap-2.5">
         <div className="flex items-start pb-4">
           <div className="flex items-center gap-4">
