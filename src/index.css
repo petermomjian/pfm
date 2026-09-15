@@ -44,6 +44,21 @@ body {
   }
 }
 
+/* Eases layout spacing/sizing across the mobile/desktop breakpoint (padding,
+   gap, width, height) instead of snapping — same easing family as
+   .pfm-interactive so viewport-driven motion reads as one system. */
+.pfm-fluid {
+  transition-property: padding, gap, width, height;
+  transition-duration: 300ms;
+  transition-timing-function: var(--ease-out-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pfm-fluid {
+    transition-duration: 1ms;
+  }
+}
+
 .pfm-slider-input {
   position: absolute;
   inset: 0;

@@ -17,6 +17,19 @@ const SPIN_TRANSITION_MS = 600; // medium-length spin-up/spin-down
 const easeInCubic = (t: number) => t * t * t;
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
+// Eases the platter between its desktop/mobile sizes (currently a discrete
+// JS-driven swap, not a CSS breakpoint) so it resizes instead of snapping.
+const SIZE_TRANSITION = {
+  transitionProperty: "width, height",
+  transitionDuration: "300ms",
+  transitionTimingFunction: "var(--ease-out-subtle)",
+} as const;
+const SCALE_TRANSITION = {
+  transitionProperty: "transform",
+  transitionDuration: "300ms",
+  transitionTimingFunction: "var(--ease-out-subtle)",
+} as const;
+
 type SpinPhase = "idle" | "accelerating" | "steady" | "decelerating";
 
 // Drives the platter's rotation with a real angular velocity instead of
@@ -111,6 +124,7 @@ function FlatVinylMark({ size, className }: { size: number; className?: string }
         backgroundColor: "var(--surface)",
         position: "relative",
         flexShrink: 0,
+        ...SIZE_TRANSITION,
       }}
     >
       <div
@@ -122,6 +136,7 @@ function FlatVinylMark({ size, className }: { size: number; className?: string }
           height: size * 0.4,
           borderRadius: "9999px",
           backgroundColor: "rgba(10, 10, 10, 0.5)",
+          ...SIZE_TRANSITION,
         }}
       />
       <div
@@ -133,6 +148,7 @@ function FlatVinylMark({ size, className }: { size: number; className?: string }
           height: size * 0.05,
           borderRadius: "9999px",
           backgroundColor: "var(--surface-strong)",
+          ...SIZE_TRANSITION,
         }}
       />
     </div>
@@ -160,7 +176,10 @@ export function VinylMark({
   }
 
   return (
-    <div className={className} style={{ width: size, height: size, position: "relative", flexShrink: 0 }}>
+    <div
+      className={className}
+      style={{ width: size, height: size, position: "relative", flexShrink: 0, ...SIZE_TRANSITION }}
+    >
       <div
         style={{
           position: "absolute",
@@ -170,6 +189,7 @@ export function VinylMark({
           height: BASE_SIZE,
           transform: `scale(${scale})`,
           transformOrigin: "top left",
+          ...SCALE_TRANSITION,
         }}
       >
         <div className="absolute left-0 top-0 size-[512px]">

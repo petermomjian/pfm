@@ -8,9 +8,9 @@ export function Header() {
 
   return (
     <div className="flex w-full items-center justify-between pointer-events-auto">
-      <Logo height={32} role="img" aria-label={SITE_NAME} />
+      <Logo height={32} className="pfm-fluid h-6 w-auto md:h-8" role="img" aria-label={SITE_NAME} />
 
-      <div className="flex items-center gap-4">
+      <div className="hidden items-center gap-4 md:flex">
         <div className="flex flex-col items-end justify-center gap-0.5 text-sm w-28 min-w-0 shrink-0">
           {track ? (
             <>
