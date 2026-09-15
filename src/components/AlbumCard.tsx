@@ -17,12 +17,13 @@ const ARTWORK_OVERLAY =
   "linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,0) 100%)";
 
 interface AlbumSleeveProps {
-  album: Album;
   size: number; // px — square face depth/height, shared with the perspective scene's height
-  onSelect: (albumId: string) => void;
+  cardKey: string;
+  onSelect: (cardKey: string, sleeveEl: HTMLDivElement) => void;
+  registerRef: (cardKey: string, el: HTMLDivElement | null) => void;
 }
 
-export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
+export function AlbumSleeve({ size, cardKey, onSelect, registerRef }: AlbumSleeveProps) {
   const faceStyle: CSSProperties = {
     width: size,
     height: size,
@@ -35,9 +36,10 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
 
   return (
     <div
+      ref={(el) => registerRef(cardKey, el)}
       className="relative h-full shrink-0 cursor-pointer"
       style={{ width: SPINE_WIDTH, transformStyle: "preserve-3d" }}
-      onClick={() => onSelect(album.id)}
+      onClick={(e) => onSelect(cardKey, e.currentTarget)}
     >
       <div
         className="absolute inset-y-0 left-0 border"
@@ -59,11 +61,12 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
 
 interface AlbumMetaProps {
   album: Album;
-  onSelect: (albumId: string) => void;
-  onPlay: (albumId: string) => void;
+  cardKey: string;
+  onSelect: (cardKey: string) => void;
+  onPlay: (cardKey: string) => void;
 }
 
-export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
+export function AlbumMeta({ album, cardKey, onSelect, onPlay }: AlbumMetaProps) {
   const { track, isPlaying, togglePlay } = usePlayer();
   const isThisAlbumActive = Boolean(track && album.tracks.some((t) => t.id === track.id));
   const isThisAlbumPlaying = isThisAlbumActive && isPlaying;
@@ -73,7 +76,7 @@ export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
       <div
         className="absolute bottom-0 left-0 flex -translate-x-3 flex-col items-start gap-[36px] cursor-pointer"
         style={{ width: "var(--slot-width)" }}
-        onClick={() => onSelect(album.id)}
+        onClick={() => onSelect(cardKey)}
       >
         <div className="pfm-interactive -m-3 flex w-full translate-x-3 flex-col items-start gap-1.5 rounded-[8px] p-3 text-xs hover:bg-[var(--surface)]">
           <p className="w-full text-foreground">{album.title}</p>
@@ -87,7 +90,7 @@ export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
             if (isThisAlbumActive) {
               togglePlay();
             } else {
-              onPlay(album.id);
+              onPlay(cardKey);
             }
           }}
           className="pfm-interactive flex size-9 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
