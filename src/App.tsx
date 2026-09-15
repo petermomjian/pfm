@@ -1,19 +1,25 @@
 import { useState } from "react";
 import { albums } from "@/data/albums";
 import { PlayerProvider, usePlayer } from "@/player/PlayerContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { Header } from "@/components/Header";
 import { GlobalPlayerBar } from "@/components/GlobalPlayerBar";
+import { MobileTransportBar } from "@/components/MobileTransportBar";
 import { AlbumLibrary } from "@/components/AlbumLibrary";
-import { FocusedAlbum } from "@/components/FocusedAlbum";
+import { FocusedAlbum, BackToLibrary } from "@/components/FocusedAlbum";
+
+type View = { screen: "library" } | { screen: "focused"; albumId: string };
 
 function Stage({
   view,
   onSelect,
   onBack,
+  isMobile,
 }: {
-  view: { screen: "library" } | { screen: "focused"; albumId: string };
+  view: View;
   onSelect: (albumId: string) => void;
   onBack: () => void;
+  isMobile: boolean;
 }) {
   const { playTrack } = usePlayer();
 
@@ -27,29 +33,38 @@ function Stage({
   if (view.screen === "focused") {
     const album = albums.find((a) => a.id === view.albumId);
     if (!album) return null;
-    return <FocusedAlbum album={album} onBack={onBack} />;
+    return <FocusedAlbum album={album} onBack={onBack} isMobile={isMobile} />;
   }
 
   return <AlbumLibrary onSelect={onSelect} onPlay={handlePlay} />;
 }
 
 function AppShell() {
-  const [view, setView] = useState<{ screen: "library" } | { screen: "focused"; albumId: string }>({
-    screen: "library",
-  });
+  const [view, setView] = useState<View>({ screen: "library" });
+  const isMobile = useIsMobile();
+  const onBack = () => setView({ screen: "library" });
+
+  const focusedAlbum = view.screen === "focused" ? albums.find((a) => a.id === view.albumId) : undefined;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
       <Stage
         view={view}
         onSelect={(albumId) => setView({ screen: "focused", albumId })}
-        onBack={() => setView({ screen: "library" })}
+        onBack={onBack}
+        isMobile={isMobile}
       />
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center">
-        <div className="flex h-full w-full max-w-[1920px] flex-col justify-between px-16 py-9">
-          <Header />
-          <GlobalPlayerBar />
+        <div className="pfm-fluid flex h-full w-full max-w-[1920px] flex-col justify-between px-6 py-9 md:px-16">
+          {isMobile && focusedAlbum ? (
+            <div className="pointer-events-auto flex w-full items-center justify-start">
+              <BackToLibrary title={focusedAlbum.title} onBack={onBack} />
+            </div>
+          ) : (
+            <Header />
+          )}
+          {isMobile ? <MobileTransportBar /> : <GlobalPlayerBar />}
         </div>
       </div>
     </div>
