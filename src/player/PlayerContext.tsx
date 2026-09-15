@@ -114,6 +114,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The native `timeupdate` event fires only a handful of times per second,
+  // which reads as visible steps in the seek bar's position and label —
+  // not a smooth slide. Drive the displayed time from a rAF loop instead,
+  // synced to actual audio playback (not the transport's `isPlaying` intent)
+  // so it doesn't advance while paused/buffering.
+  useEffect(() => {
+    if (!isAudioPlaying) return;
+    let rafId: number;
+    const tick = () => {
+      const audio = audioRef.current;
+      if (audio) setCurrentTime(audio.currentTime);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [isAudioPlaying]);
+
   const playTrack = useCallback((albumId: string, trackId: string) => {
     const { album: nextAlbum, track: nextTrack } = findTrack(albumId, trackId);
     const audio = audioRef.current;
