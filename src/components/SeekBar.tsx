@@ -77,35 +77,50 @@ export function SeekBar({ currentTime, duration, onSeek, disabled = false, alway
         </div>
       )}
 
-      {/* Track: one continuous elapsed/remaining split shared by hover + active, fades/slides in */}
+      {/* Track: elapsed segment — label — remaining segment, laid out as real grid columns so the
+          label sits in an actual 4px gap instead of masking the line behind it with a background patch
+          (which would show as a visible box over a non-solid — e.g. blurred album art — backdrop).
+          Segments are omitted at the 0%/100% extremes rather than rendered at zero width, matching Figma.
+          While pressed, the label lifts clear of the track instead of sitting in the gap, so the gap
+          closes and the track reads as one continuous line underneath it (matches desktop's seek/drag state). */}
       <div
         aria-hidden
-        className={`pointer-events-none absolute inset-0 flex items-center transition-[opacity,transform] duration-200 ${
+        className={`pointer-events-none absolute inset-0 grid items-center transition-[opacity,transform] duration-200 ${
+          isPressed ? "gap-x-0" : "gap-x-1"
+        } ${
           expanded
             ? "translate-x-0 opacity-100"
             : "-translate-x-1.5 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100"
         }`}
-        style={EASE}
+        style={{
+          // flex/fr-grow tracks playback position 1:1 with no transition — it already updates every timeupdate
+          // tick, and easing that on top produces a stair-step/rubber-band stutter instead of smooth motion
+          gridTemplateColumns: isPressed
+            ? `minmax(0,${percent}fr) minmax(0,${100 - percent}fr)`
+            : percent <= 0
+              ? "auto minmax(0,1fr)"
+              : percent >= 100
+                ? "minmax(0,1fr) auto"
+                : `minmax(0,${percent}fr) auto minmax(0,${100 - percent}fr)`,
+          ...EASE,
+        }}
       >
-        {/* flex-grow tracks playback position 1:1 with no transition — it already updates every timeupdate tick, and easing that on top produces a stair-step/rubber-band stutter instead of smooth motion */}
-        <div className="h-0.5 min-w-0 rounded-full bg-foreground" style={{ flexGrow: percent, flexBasis: 0 }} />
-        <div className="h-0.5 min-w-0 rounded-full bg-muted" style={{ flexGrow: 100 - percent, flexBasis: 0 }} />
-      </div>
+        {percent > 0 && <div className="h-0.5 min-w-0 rounded-full bg-foreground" />}
+        {!isPressed && (
+          <span className="whitespace-nowrap text-sm text-foreground" style={TABULAR_NUMS}>
+            {formatTime(currentTime)}
+          </span>
+        )}
+        {percent < 100 && <div className="h-0.5 min-w-0 rounded-full bg-muted" />}
 
-      {/* Current-time label: right-aligned to the elapsed/remaining boundary, vertically centered on the track, lifts clear of it while pressed */}
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-y-0 flex -translate-x-full items-center whitespace-nowrap transition-[opacity,transform] duration-200 ${
-          isPressed ? "-translate-y-6" : ""
-        } ${
-          expanded
-            ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-        }`}
-        style={{ left: `${percent}%`, ...EASE, ...TABULAR_NUMS }}
-      >
-        {/* Solid background masks the track line directly behind the digits instead of drawing a stroke through them */}
-        <span className="bg-background px-1 text-sm text-foreground">{formatTime(currentTime)}</span>
+        {isPressed && (
+          <span
+            className="pointer-events-none absolute bottom-full left-0 mb-1.5 -translate-x-1/2 whitespace-nowrap text-sm text-foreground"
+            style={{ left: `${percent}%`, ...TABULAR_NUMS }}
+          >
+            {formatTime(currentTime)}
+          </span>
+        )}
       </div>
     </div>
   );
