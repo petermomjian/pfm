@@ -1,13 +1,25 @@
 import { usePlayer } from "@/player/PlayerContext";
+import { SeekBar } from "./SeekBar";
 import { Slider } from "./Slider";
-import { VinylMark } from "./VinylMark";
 import { IconSwap } from "./icons/IconSwap";
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "./icons/TransportIcons";
 import { MuteIcon, VolumeIcon, VolumeLowIcon, VolumeMinIcon } from "./icons/VolumeIcons";
 
 export function GlobalPlayerBar() {
-  const { track, isPlaying, isAudioPlaying, volume, isMuted, togglePlay, next, prev, setVolume, toggleMute } =
-    usePlayer();
+  const {
+    track,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isMuted,
+    togglePlay,
+    next,
+    prev,
+    seek,
+    setVolume,
+    toggleMute,
+  } = usePlayer();
 
   const volumeLevel = isMuted ? "mute" : volume >= 2 / 3 ? "high" : volume >= 1 / 3 ? "low" : "min";
   const VolumeGlyph = isMuted
@@ -75,18 +87,8 @@ export function GlobalPlayerBar() {
         </div>
       </div>
 
-      <div className="flex flex-1 min-w-0 items-center justify-end gap-4">
-        <div className="flex flex-col items-start justify-center gap-0.5 text-sm w-28 min-w-0">
-          {track ? (
-            <>
-              <span className="text-muted">Now Playing</span>
-              <span className="truncate w-full">{track.title}</span>
-            </>
-          ) : (
-            <span className="text-muted">Nothing Playing</span>
-          )}
-        </div>
-        <VinylMark size={80} spinning={isAudioPlaying} flat={!track} />
+      <div className="flex flex-1 min-w-0 items-center justify-end">
+        <SeekBar currentTime={currentTime} duration={duration} onSeek={seek} disabled={!track} />
       </div>
     </div>
   );

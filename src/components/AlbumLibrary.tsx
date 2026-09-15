@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { albums } from "@/data/albums";
 import { AlbumSleeve, AlbumMeta, SPINE_WIDTH } from "./AlbumCard";
 
@@ -9,9 +9,21 @@ interface AlbumLibraryProps {
 
 const SPACING_VW = 0.15; // spine-to-spine pitch, as a fraction of viewport width
 const SLEEVE_TOP_VH = 0.47; // sleeve top edge, as a fraction of viewport height — also the perspective's vertical vanishing point
-const SLEEVE_SIZE = 768; // px — square face depth/height, and the perspective scene's height
+const SLEEVE_SIZE = 768; // px — square face depth/height, and the perspective scene's height, at/above DESKTOP_BREAKPOINT
 const GAP_ABOVE_SLEEVE = 54; // px between the metadata block and the sleeve top
-const PERSPECTIVE = 1200; // shared stationary camera depth
+const PERSPECTIVE = 1200; // shared stationary camera depth, at/above DESKTOP_BREAKPOINT
+
+// Below this viewport width, the sleeve (and perspective depth, to keep the
+// same rotation appearance) scale down linearly with viewport width. Every
+// sleeve in the loop is mounted simultaneously (see REPEAT_COUNT below), each
+// as a full 3D-composited GPU layer at SLEEVE_SIZE^2 — left at a constant
+// 768px that's dozens of desktop-scale composited layers on a phone, which
+// exceeds iOS Safari/Chrome's (shared WebKit) per-tab GPU memory budget and
+// crashes the tab outright. Scaling down shrinks each layer's backing store
+// by the square of the scale factor, keeping the same design at a memory
+// footprint mobile WebKit can actually hold.
+const DESKTOP_BREAKPOINT = 1024;
+const MIN_SLEEVE_SIZE = 160;
 const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
 const CLICK_DRAG_THRESHOLD = 6; // px of pointer movement before a click becomes a drag
 const WHEEL_LINE_HEIGHT = 16; // px per "line" when a wheel event reports deltaMode 1
@@ -24,10 +36,21 @@ const WHEEL_VELOCITY_SCALE = 0.0037; // converts a wheel event's px delta into a
 // a full spare cycle of rendered content on either side of the visible window.
 const REPEAT_COUNT = 3;
 
+function sleeveSizeForViewport(viewportWidth: number): number {
+  if (viewportWidth >= DESKTOP_BREAKPOINT) return SLEEVE_SIZE;
+  const scaled = SLEEVE_SIZE * (viewportWidth / DESKTOP_BREAKPOINT);
+  return Math.max(MIN_SLEEVE_SIZE, scaled);
+}
+
 export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const metaTrackRef = useRef<HTMLDivElement | null>(null);
+
+  // Lazy initializer so the very first paint already uses the correct
+  // viewport-scaled size — avoiding a flash at full desktop size (and its
+  // GPU memory spike) before the resize effect below can correct it.
+  const [sleeveSize, setSleeveSize] = useState(() => sleeveSizeForViewport(window.innerWidth));
 
   const spacing = useRef(SLEEVE_SIZE * SPACING_VW);
   const x = useRef(0);
@@ -59,6 +82,9 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
 
       const oldSpacing = spacing.current;
       const oldBaseX = baseX.current;
+
+      const nextSleeveSize = sleeveSizeForViewport(window.innerWidth);
+      setSleeveSize((prev) => (prev === nextSleeveSize ? prev : nextSleeveSize));
 
       const spacingPx = window.innerWidth * SPACING_VW;
       spacing.current = spacingPx;
@@ -226,8 +252,11 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
         className="absolute left-0 w-full"
         style={{
           top: `${SLEEVE_TOP_VH * 100}%`,
-          height: SLEEVE_SIZE,
-          perspective: PERSPECTIVE,
+          height: sleeveSize,
+          // Scales with the sleeve so the rotateY faces keep the same apparent
+          // depth/foreshortening at every size instead of going flatter as
+          // the sleeve shrinks.
+          perspective: PERSPECTIVE * (sleeveSize / SLEEVE_SIZE),
           perspectiveOrigin: "50% 0%",
           transformStyle: "preserve-3d",
         }}
@@ -238,7 +267,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
           style={{ transformStyle: "preserve-3d" }}
         >
           {repeatedAlbums.map(({ album, key }) => (
-            <AlbumSleeve key={key} album={album} size={SLEEVE_SIZE} onSelect={handleSelect} />
+            <AlbumSleeve key={key} album={album} size={sleeveSize} onSelect={handleSelect} />
           ))}
         </div>
       </div>
