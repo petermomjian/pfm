@@ -6,7 +6,14 @@ import { IconSwap } from "./icons/IconSwap";
 
 // Visible thickness of the sleeve's front edge — the part of every sleeve
 // that stays on-screen even when its face has rotated edge-on at center.
+// This doubles as the sleeve's actual Z depth: the front and back cover
+// planes below sit exactly this far apart, so the spine is a real connecting
+// face of the box, not a decorative border painted at an arbitrary width.
 export const SPINE_WIDTH = 12;
+
+// Fill for every face except the printed front cover — the "material" of
+// the sleeve (inner back cover, top/bottom/far edges) rather than artwork.
+const EDGE_COLOR = "#1c1c1f";
 
 // Each face plane pivots from the spine (local x=0, z=0 — nearest the
 // viewer) and extends backward into -Z as local x grows toward `size`
@@ -22,6 +29,13 @@ interface AlbumSleeveProps {
   onSelect: (albumId: string) => void;
 }
 
+// Builds the sleeve as a true 6-sided box in the shared preserve-3d scene: a
+// front cover plane and a second, parallel back-cover plane offset by the
+// sleeve's real thickness (SPINE_WIDTH) along its own depth axis, with
+// spine/far/top/bottom faces filling the gap between their matching edges.
+// Every non-spine/far face is rendered as a normal-flipped pair (scaleZ(-1),
+// geometry unchanged) so it stays visible whichever side of the scene's
+// fixed vanishing point the sleeve has scrolled to.
 export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
   const faceStyle: CSSProperties = {
     width: size,
@@ -33,25 +47,73 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
     backfaceVisibility: "hidden",
   };
 
+  // Same footprint as the front face, translated along its own (already
+  // rotated) depth axis by the real sleeve thickness — a genuine second
+  // plane, not the front face re-shown with a flipped normal.
+  const backFaceStyle: CSSProperties = {
+    ...faceStyle,
+    backgroundColor: EDGE_COLOR,
+    backgroundImage: undefined,
+  };
+
+  // Top/bottom walls: real quads spanning the full receding depth (size) by
+  // the sleeve's thickness (SPINE_WIDTH) — the "roof" and "floor" that
+  // stitch the front face's top/bottom edge to the back face's, not a flat
+  // strip painted alongside the face.
+  const edgeWallStyle: CSSProperties = {
+    width: size,
+    height: SPINE_WIDTH,
+    backgroundColor: EDGE_COLOR,
+    borderColor: "var(--surface-border)",
+    transformOrigin: "left top",
+    backfaceVisibility: "hidden",
+  };
+
   return (
     <div
       className="relative h-full shrink-0 cursor-pointer"
       style={{ width: SPINE_WIDTH, transformStyle: "preserve-3d" }}
       onClick={() => onSelect(album.id)}
     >
+      {/* Spine: the sleeve's near edge, facing the camera head-on (never
+          rotated) — connects the front face's near boundary to the back
+          face's near boundary, SPINE_WIDTH away. */}
+      <div
+        className="absolute inset-y-0 left-0 border"
+        style={{ width: SPINE_WIDTH, backgroundColor: "var(--surface)", borderColor: "var(--surface-border)" }}
+      />
+      {/* Far edge: the same near-edge geometry, pushed straight back by the
+          sleeve's full receding depth — connects the front and back faces'
+          deepest boundary. */}
       <div
         className="absolute inset-y-0 left-0 border"
         style={{
           width: SPINE_WIDTH,
-          backgroundColor: "var(--surface)",
+          backgroundColor: EDGE_COLOR,
           borderColor: "var(--surface-border)",
+          transform: `translateZ(-${size}px)`,
         }}
       />
-      {/* Face extends backward from the spine into -Z; the sleeve passing
-          through screen center becomes edge-on purely from that projection. */}
+
+      {/* Top wall — rotateY matches the faces' own receding path; rotateX
+          then folds the panel flat so it bridges the front/back faces' top
+          edges instead of duplicating the faces' own vertical plane. */}
+      <div className="absolute left-0 top-0 border" style={{ ...edgeWallStyle, transform: "rotateY(90deg) rotateX(90deg)" }} />
+      <div className="absolute left-0 top-0 border" style={{ ...edgeWallStyle, transform: "rotateY(90deg) rotateX(90deg) scaleZ(-1)" }} />
+      {/* Bottom wall — identical geometry, shifted down by the full face
+          height so it bridges the bottom edges instead. */}
+      <div className="absolute left-0 border" style={{ ...edgeWallStyle, top: size, transform: "rotateY(90deg) rotateX(90deg)" }} />
+      <div className="absolute left-0 border" style={{ ...edgeWallStyle, top: size, transform: "rotateY(90deg) rotateX(90deg) scaleZ(-1)" }} />
+
+      {/* Back cover: the front face's plane translated by the real sleeve
+          thickness along its own post-rotation depth axis. */}
+      <div className="absolute left-0 top-0 border" style={{ ...backFaceStyle, transform: `rotateY(90deg) translateZ(${SPINE_WIDTH}px)` }} />
+      <div className="absolute left-0 top-0 border" style={{ ...backFaceStyle, transform: `rotateY(90deg) translateZ(${SPINE_WIDTH}px) scaleZ(-1)` }} />
+
+      {/* Front cover (the album artwork) extends backward from the spine
+          into -Z; drawn last in DOM order so it reliably occludes the
+          back/edge geometry behind it even where 3D sort order is ambiguous. */}
       <div className="absolute left-0 top-0 border" style={{ ...faceStyle, transform: "rotateY(90deg)" }} />
-      {/* Same plane, opposite normal (scaleZ flips facing without moving the
-          geometry) — keeps the far side of center from disappearing. */}
       <div className="absolute left-0 top-0 border" style={{ ...faceStyle, transform: "rotateY(90deg) scaleZ(-1)" }} />
     </div>
   );
