@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pause, Play } from "lucide-react";
 import type { Album } from "@/data/albums";
 import { usePlayer } from "@/player/PlayerContext";
 import { VinylMark } from "./VinylMark";
 import { TrackRow } from "./TrackRow";
+import { IconSwap } from "./icons/IconSwap";
 
 const MAX_DESKTOP_VINYL_SIZE = 512;
 const MIN_DESKTOP_VINYL_SIZE = 240;
@@ -11,12 +12,25 @@ const DESKTOP_ROW_GAP = 64; // matches md:gap-16 below
 const MOBILE_VINYL_SIZE = 205;
 
 interface BackToLibraryProps {
-  title: string;
+  album: Album;
   onBack: () => void;
   className?: string;
 }
 
-export function BackToLibrary({ title, onBack, className }: BackToLibraryProps) {
+export function BackToLibrary({ album, onBack, className }: BackToLibraryProps) {
+  const { track, isPlaying, playTrack, togglePlay } = usePlayer();
+  const isThisAlbumActive = Boolean(track && album.tracks.some((t) => t.id === track.id));
+  const isThisAlbumPlaying = isThisAlbumActive && isPlaying;
+
+  const handlePlay = () => {
+    if (isThisAlbumActive) {
+      togglePlay();
+      return;
+    }
+    const firstTrack = album.tracks[0];
+    if (firstTrack) playTrack(album.id, firstTrack.id);
+  };
+
   return (
     <div className={`flex items-center gap-4 ${className ?? ""}`}>
       <button
@@ -27,7 +41,19 @@ export function BackToLibrary({ title, onBack, className }: BackToLibraryProps) 
       >
         <ArrowLeft size={16} />
       </button>
-      <p className="text-base font-medium">{title}</p>
+      <div className="flex items-center gap-4 -translate-x-6">
+        <button
+          type="button"
+          aria-label={isThisAlbumPlaying ? `Pause ${album.title}` : `Play ${album.title}`}
+          onClick={handlePlay}
+          className="pfm-interactive flex size-9 translate-x-2 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
+        >
+          <IconSwap id={isThisAlbumPlaying ? "pause" : "play"} size={16} scale={0.4} blur={10}>
+            {isThisAlbumPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+          </IconSwap>
+        </button>
+        <p className="text-base font-medium">{album.title}</p>
+      </div>
     </div>
   );
 }
@@ -135,7 +161,7 @@ export function FocusedAlbum({ album, onBack, isMobile }: FocusedAlbumProps) {
           className="flex w-full flex-col items-start justify-center gap-2.5 md:h-full md:w-auto md:min-w-64"
         >
           <div className="hidden shrink-0 items-start pb-4 md:flex">
-            <BackToLibrary title={album.title} onBack={onBack} />
+            <BackToLibrary album={album} onBack={onBack} />
           </div>
           <div className="relative w-full md:min-h-0">
             <div

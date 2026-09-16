@@ -27,6 +27,9 @@ interface AlbumSleeveProps {
   album: Album;
   size: number; // px — square face depth/height, shared with the perspective scene's height
   onSelect: (albumId: string) => void;
+  // True while the matching AlbumMeta's title or play button is hovered —
+  // lifts the sleeve to echo that hover back onto the artwork.
+  raised?: boolean;
 }
 
 // Builds the sleeve as a true 6-sided box in the shared preserve-3d scene: a
@@ -49,7 +52,7 @@ interface AlbumSleeveProps {
 // (non-preserve-3d) group flattens it into one layer *before* it competes
 // with the front cover, so the front cover — a later sibling of the group,
 // not of the individual back faces — reliably wins on both sides.
-export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
+export function AlbumSleeve({ album, size, onSelect, raised = false }: AlbumSleeveProps) {
   const faceStyle: CSSProperties = {
     width: size,
     height: size,
@@ -82,8 +85,12 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
 
   return (
     <div
-      className="relative h-full shrink-0 cursor-pointer"
-      style={{ width: SPINE_WIDTH, transformStyle: "preserve-3d" }}
+      className="pfm-sleeve-lift relative h-full shrink-0 cursor-pointer"
+      style={{
+        width: SPINE_WIDTH,
+        transformStyle: "preserve-3d",
+        transform: raised ? "translateY(-24px)" : "translateY(0px)",
+      }}
       onClick={() => onSelect(album.id)}
     >
       {/* Spine: the sleeve's near edge, facing the camera head-on (never
@@ -140,9 +147,15 @@ interface AlbumMetaProps {
   // its real rendered height (title/artist text can wrap) and keep it clear
   // of the header above.
   contentRef?: Ref<HTMLDivElement>;
+  // Reported while the title-through-play-button area is hovered, so the
+  // library row can lift this album's sleeve in the separate perspective
+  // scene. Bound to the whole flex column (not the title/button individually)
+  // so the gap between them stays part of one continuous hover region —
+  // otherwise crossing it drops the hover and bounces the sleeve.
+  onHoverChange?: (hovering: boolean) => void;
 }
 
-export function AlbumMeta({ album, onSelect, onPlay, contentRef }: AlbumMetaProps) {
+export function AlbumMeta({ album, onSelect, onPlay, contentRef, onHoverChange }: AlbumMetaProps) {
   const { track, isPlaying, togglePlay } = usePlayer();
   const isThisAlbumActive = Boolean(track && album.tracks.some((t) => t.id === track.id));
   const isThisAlbumPlaying = isThisAlbumActive && isPlaying;
@@ -154,6 +167,8 @@ export function AlbumMeta({ album, onSelect, onPlay, contentRef }: AlbumMetaProp
         className="absolute bottom-0 left-0 flex -translate-x-3 flex-col items-start gap-[36px] cursor-pointer"
         style={{ width: "var(--slot-width)" }}
         onClick={() => onSelect(album.id)}
+        onMouseEnter={() => onHoverChange?.(true)}
+        onMouseLeave={() => onHoverChange?.(false)}
       >
         <div className="pfm-interactive -m-3 flex w-full translate-x-3 flex-col items-start gap-1.5 rounded-[8px] p-3 text-xs hover:bg-[var(--surface)]">
           <p className="w-full text-foreground">{album.title}</p>

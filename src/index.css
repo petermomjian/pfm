@@ -80,6 +80,21 @@ body {
   }
 }
 
+/* Slower and more deliberate than .pfm-interactive's hover/active speed — a
+   large sleeve easing up 24px reads better as a considered lift than a
+   hover-speed flicker. */
+.pfm-sleeve-lift {
+  transition-property: transform;
+  transition-duration: 400ms;
+  transition-timing-function: var(--ease-out-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pfm-sleeve-lift {
+    transition-duration: 1ms;
+  }
+}
+
 /* Hides the scrollbar on the desktop tracklist scroll region — the gradient
    masks communicate scrollability instead, matching the Figma "Track Mask". */
 .pfm-no-scrollbar {

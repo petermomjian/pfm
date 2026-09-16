@@ -58,7 +58,7 @@ function AppShell() {
         <div className="pfm-fluid relative z-20 flex h-full w-full max-w-[1920px] flex-col justify-between px-6 py-9 md:px-16">
           {isMobile && focusedAlbum ? (
             <div className="pointer-events-auto flex w-full items-center justify-start">
-              <BackToLibrary title={focusedAlbum.title} onBack={onBack} />
+              <BackToLibrary album={focusedAlbum} onBack={onBack} />
             </div>
           ) : (
             <Header onSelectAlbum={onSelect} />

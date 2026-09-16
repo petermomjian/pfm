@@ -71,6 +71,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isAdvancingRef.current = true;
       } else {
         setIsAudioPlaying(false);
+        setIsPlaying(false);
       }
       nextRef.current();
     };

@@ -88,6 +88,10 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const metaTrackRef = useRef<HTMLDivElement | null>(null);
   const metaContentRef = useRef<HTMLDivElement | null>(null); // first item only, used to measure real metadata block height
 
+  // Key of the repeated-album item whose title/play button is hovered — the
+  // matching sleeve (same key, in the separate perspective track) lifts.
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
   // Lazy initializer so the very first paint already uses the correct
   // viewport-scaled size — avoiding a flash at full desktop size (and its
   // GPU memory spike) before the resize effect below can correct it.
@@ -300,6 +304,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
             onSelect={handleSelect}
             onPlay={handlePlay}
             contentRef={index === 0 ? metaContentRef : undefined}
+            onHoverChange={(hovering) => setHoveredKey(hovering ? key : null)}
           />
         ))}
       </div>
@@ -324,7 +329,13 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
           style={{ transformStyle: "preserve-3d" }}
         >
           {repeatedAlbums.map(({ album, key }) => (
-            <AlbumSleeve key={key} album={album} size={sleeveSize} onSelect={handleSelect} />
+            <AlbumSleeve
+              key={key}
+              album={album}
+              size={sleeveSize}
+              onSelect={handleSelect}
+              raised={key === hoveredKey}
+            />
           ))}
         </div>
       </div>
