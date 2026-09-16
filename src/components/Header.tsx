@@ -5,19 +5,29 @@ import { VinylMark } from "@/components/VinylMark";
 import { usePlayer } from "@/player/PlayerContext";
 import { TRACK_SWAP_TRANSITION } from "@/lib/motion";
 
-export function Header() {
-  const { track, isAudioPlaying } = usePlayer();
+interface HeaderProps {
+  onSelectAlbum: (albumId: string) => void;
+}
+
+export function Header({ onSelectAlbum }: HeaderProps) {
+  const { album, track, isAudioPlaying } = usePlayer();
   const reduceMotion = useReducedMotion();
 
   return (
     <div className="flex w-full items-center justify-between pointer-events-auto md:h-[var(--pfm-chrome-row-h)]">
       <Logo height={32} className="pfm-fluid h-6 w-auto md:h-8" role="img" aria-label={SITE_NAME} />
 
-      <div className="hidden items-center gap-4 md:flex">
+      <button
+        type="button"
+        aria-label={album ? `Go to ${album.title}` : "Nothing playing"}
+        onClick={() => album && onSelectAlbum(album.id)}
+        disabled={!album}
+        className="pfm-interactive group hidden items-center gap-4 hover:scale-105 hover:opacity-80 active:scale-95 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none md:flex"
+      >
         <div className="flex flex-col items-end justify-center gap-0.5 text-sm w-28 min-w-0 shrink-0">
           {track ? (
             <>
-              <span className="text-muted">Now Playing</span>
+              <span className="text-muted group-hover:text-foreground">Now Playing</span>
               <span className="relative h-5 w-full">
                 <AnimatePresence initial={false} mode="popLayout">
                   <motion.span
@@ -34,11 +44,11 @@ export function Header() {
               </span>
             </>
           ) : (
-            <span className="text-muted">Nothing Playing</span>
+            <span className="text-muted group-hover:text-foreground">Nothing Playing</span>
           )}
         </div>
         <VinylMark size={80} spinning={isAudioPlaying} flat={!track} />
-      </div>
+      </button>
     </div>
   );
 }

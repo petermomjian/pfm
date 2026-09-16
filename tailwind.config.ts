@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -19,5 +20,13 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // iOS Safari simulates :hover on tap and only clears it when a different
+    // element is next touched, so touch users see hover/pressed styling
+    // "stick" after tapping a button. Gate hover: to real hover-capable
+    // pointers so touch devices never enter that sticky state.
+    plugin(({ addVariant }) => {
+      addVariant("hover", "@media (hover: hover) and (pointer: fine) { &:hover }");
+    }),
+  ],
 } satisfies Config;

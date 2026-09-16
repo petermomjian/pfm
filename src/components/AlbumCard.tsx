@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, Ref } from "react";
 import { Pause, Play } from "lucide-react";
 import type { Album } from "@/data/albums";
 import { usePlayer } from "@/player/PlayerContext";
@@ -61,9 +61,13 @@ interface AlbumMetaProps {
   album: Album;
   onSelect: (albumId: string) => void;
   onPlay: (albumId: string) => void;
+  // Attached only to a representative item so the library row can measure
+  // its real rendered height (title/artist text can wrap) and keep it clear
+  // of the header above.
+  contentRef?: Ref<HTMLDivElement>;
 }
 
-export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
+export function AlbumMeta({ album, onSelect, onPlay, contentRef }: AlbumMetaProps) {
   const { track, isPlaying, togglePlay } = usePlayer();
   const isThisAlbumActive = Boolean(track && album.tracks.some((t) => t.id === track.id));
   const isThisAlbumPlaying = isThisAlbumActive && isPlaying;
@@ -71,6 +75,7 @@ export function AlbumMeta({ album, onSelect, onPlay }: AlbumMetaProps) {
   return (
     <div className="relative shrink-0" style={{ width: SPINE_WIDTH }}>
       <div
+        ref={contentRef}
         className="absolute bottom-0 left-0 flex -translate-x-3 flex-col items-start gap-[36px] cursor-pointer"
         style={{ width: "var(--slot-width)" }}
         onClick={() => onSelect(album.id)}

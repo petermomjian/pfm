@@ -8,8 +8,13 @@ import { MuteIcon, VolumeIcon } from "./icons/VolumeIcons";
 const GHOST_BUTTON =
   "pfm-interactive flex flex-1 h-16 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30";
 
-export function MobileTransportBar() {
+interface MobileTransportBarProps {
+  onSelectAlbum: (albumId: string) => void;
+}
+
+export function MobileTransportBar({ onSelectAlbum }: MobileTransportBarProps) {
   const {
+    album,
     track,
     isPlaying,
     isAudioPlaying,
@@ -42,7 +47,15 @@ export function MobileTransportBar() {
 
         <SeekBar currentTime={currentTime} duration={duration} onSeek={seek} disabled={!track} alwaysExpanded />
 
-        <VinylMark size={36} spinning={isAudioPlaying} flat={!track} className="shrink-0" />
+        <button
+          type="button"
+          aria-label={album ? `Go to ${album.title}` : "Nothing playing"}
+          onClick={() => album && onSelectAlbum(album.id)}
+          disabled={!album}
+          className="pfm-interactive flex shrink-0 items-center justify-center rounded-full hover:scale-110 active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none"
+        >
+          <VinylMark size={36} spinning={isAudioPlaying} flat={!track} />
+        </button>
       </div>
 
       <div className="flex w-full items-center gap-1">

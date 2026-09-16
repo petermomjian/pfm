@@ -194,10 +194,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     );
   }, [album, track]);
 
+  // Scrubbing fires far more `input` events than the audio element can actually seek to per
+  // second — writing `currentTime` on every one of them is what made dragging feel choppy.
+  // The displayed position still updates every event (instant, cheap); only the real decoder
+  // seek is coalesced to once per frame.
+  const pendingSeekRef = useRef<number | null>(null);
+  const seekRafRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (seekRafRef.current != null) cancelAnimationFrame(seekRafRef.current);
+    };
+  }, []);
+
   const seek = useCallback((time: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = time;
     setCurrentTime(time);
+    pendingSeekRef.current = time;
+    if (seekRafRef.current == null) {
+      seekRafRef.current = requestAnimationFrame(() => {
+        seekRafRef.current = null;
+        const audio = audioRef.current;
+        if (audio && pendingSeekRef.current != null) {
+          audio.currentTime = pendingSeekRef.current;
+        }
+      });
+    }
   }, []);
 
   const setVolume = useCallback((next: number) => {

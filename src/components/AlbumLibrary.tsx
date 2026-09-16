@@ -13,6 +13,32 @@ const SLEEVE_SIZE = 768; // px — square face depth/height, and the perspective
 const GAP_ABOVE_SLEEVE = 54; // px between the metadata block and the sleeve top
 const PERSPECTIVE = 1200; // shared stationary camera depth, at/above DESKTOP_BREAKPOINT
 
+// Keeps the metadata block clear of the header on short/cramped viewports,
+// where SLEEVE_TOP_VH's percentage-of-height positioning would otherwise let
+// the row drift up underneath it. Below this, the row is pinned to a minimum
+// px offset instead of the usual percentage.
+const MIN_CLEARANCE_ABOVE_HEADER = 96; // px, required clear space above the metadata block's top edge
+// Header chrome dimensions — kept in sync with index.css's --pfm-chrome-pad /
+// --pfm-chrome-row-h (desktop) and Header.tsx's mobile Logo height (h-6).
+const CHROME_BREAKPOINT = 768; // px, Tailwind's `md` — matches Header's own layout switch
+const HEADER_PAD = 36;
+const HEADER_ROW_H = 80;
+const MOBILE_HEADER_H = 24;
+
+function headerBottomForViewport(viewportWidth: number): number {
+  return viewportWidth >= CHROME_BREAKPOINT ? HEADER_PAD + HEADER_ROW_H : HEADER_PAD + MOBILE_HEADER_H;
+}
+
+// Rough estimate of the metadata block's rendered height, used only until the
+// real measurement (which accounts for title/artist text wrapping) lands on
+// mount — keeps the very first paint from flashing at an unclamped position.
+const META_CONTENT_HEIGHT_ESTIMATE = 130;
+
+function sleeveTopForViewport(viewportWidth: number, viewportHeight: number, metaContentHeight: number): number {
+  const minSleeveTop = headerBottomForViewport(viewportWidth) + MIN_CLEARANCE_ABOVE_HEADER + metaContentHeight + GAP_ABOVE_SLEEVE;
+  return Math.max(viewportHeight * SLEEVE_TOP_VH, minSleeveTop);
+}
+
 // Below this viewport width, the sleeve (and perspective depth, to keep the
 // same rotation appearance) scale down linearly with viewport width. Every
 // sleeve in the loop is mounted simultaneously (see REPEAT_COUNT below), each
@@ -46,11 +72,18 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const metaTrackRef = useRef<HTMLDivElement | null>(null);
+  const metaContentRef = useRef<HTMLDivElement | null>(null); // first item only, used to measure real metadata block height
 
   // Lazy initializer so the very first paint already uses the correct
   // viewport-scaled size — avoiding a flash at full desktop size (and its
   // GPU memory spike) before the resize effect below can correct it.
   const [sleeveSize, setSleeveSize] = useState(() => sleeveSizeForViewport(window.innerWidth));
+  // Sleeve top edge, in px from the viewport top. Usually SLEEVE_TOP_VH of
+  // viewport height, but floored to keep MIN_CLEARANCE_ABOVE_HEADER of clear
+  // space above the metadata block on short/cramped viewports.
+  const [sleeveTop, setSleeveTop] = useState(() =>
+    sleeveTopForViewport(window.innerWidth, window.innerHeight, META_CONTENT_HEIGHT_ESTIMATE)
+  );
 
   const spacing = useRef(SLEEVE_SIZE * SPACING_VW);
   const x = useRef(0);
@@ -110,6 +143,10 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
 
       cycleWidth.current = cycle;
       baseX.current = newBaseX;
+
+      const metaContentHeight = metaContentRef.current?.getBoundingClientRect().height ?? META_CONTENT_HEIGHT_ESTIMATE;
+      const nextSleeveTop = sleeveTopForViewport(window.innerWidth, window.innerHeight, metaContentHeight);
+      setSleeveTop((prev) => (prev === nextSleeveTop ? prev : nextSleeveTop));
     };
     measure();
     window.addEventListener("resize", measure);
@@ -240,10 +277,16 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       <div
         ref={metaTrackRef}
         className="absolute left-0 flex w-full will-change-transform"
-        style={{ bottom: `calc(${(1 - SLEEVE_TOP_VH) * 100}% + ${GAP_ABOVE_SLEEVE}px)` }}
+        style={{ bottom: `calc(100% - ${sleeveTop - GAP_ABOVE_SLEEVE}px)` }}
       >
-        {repeatedAlbums.map(({ album, key }) => (
-          <AlbumMeta key={key} album={album} onSelect={handleSelect} onPlay={handlePlay} />
+        {repeatedAlbums.map(({ album, key }, index) => (
+          <AlbumMeta
+            key={key}
+            album={album}
+            onSelect={handleSelect}
+            onPlay={handlePlay}
+            contentRef={index === 0 ? metaContentRef : undefined}
+          />
         ))}
       </div>
 
@@ -251,7 +294,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       <div
         className="absolute left-0 w-full"
         style={{
-          top: `${SLEEVE_TOP_VH * 100}%`,
+          top: `${sleeveTop}px`,
           height: sleeveSize,
           // Scales with the sleeve so the rotateY faces keep the same apparent
           // depth/foreshortening at every size instead of going flatter as

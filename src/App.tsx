@@ -43,17 +43,13 @@ function AppShell() {
   const [view, setView] = useState<View>({ screen: "library" });
   const isMobile = useIsMobile();
   const onBack = () => setView({ screen: "library" });
+  const onSelect = (albumId: string) => setView({ screen: "focused", albumId });
 
   const focusedAlbum = view.screen === "focused" ? albums.find((a) => a.id === view.albumId) : undefined;
 
   return (
     <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground">
-      <Stage
-        view={view}
-        onSelect={(albumId) => setView({ screen: "focused", albumId })}
-        onBack={onBack}
-        isMobile={isMobile}
-      />
+      <Stage view={view} onSelect={onSelect} onBack={onBack} isMobile={isMobile} />
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center">
         {isMobile && focusedAlbum && (
@@ -65,9 +61,9 @@ function AppShell() {
               <BackToLibrary title={focusedAlbum.title} onBack={onBack} />
             </div>
           ) : (
-            <Header />
+            <Header onSelectAlbum={onSelect} />
           )}
-          {isMobile ? <MobileTransportBar /> : <GlobalPlayerBar />}
+          {isMobile ? <MobileTransportBar onSelectAlbum={onSelect} /> : <GlobalPlayerBar />}
         </div>
       </div>
     </div>
