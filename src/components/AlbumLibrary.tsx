@@ -48,8 +48,15 @@ function sleeveTopForViewport(viewportWidth: number, viewportHeight: number, met
 // crashes the tab outright. Scaling down shrinks each layer's backing store
 // by the square of the scale factor, keeping the same design at a memory
 // footprint mobile WebKit can actually hold.
+//
+// That scaling — and the matching spine-to-spine spacing scaling below —
+// bottoms out at CHROME_BREAKPOINT (this app's mobile/desktop split, shared
+// with useIsMobile): below it, sleeve size and spacing are pinned to their
+// value at that width instead of continuing to shrink with the viewport, and
+// the viewport clips the now-oversized row instead. This does narrow the GPU
+// memory margin on phones (sleeves stay ~576px there instead of shrinking
+// further) — worth a real-device check if crashes reappear.
 const DESKTOP_BREAKPOINT = 1024;
-const MIN_SLEEVE_SIZE = 160;
 const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
 const CLICK_DRAG_THRESHOLD = 6; // px of pointer movement before a click becomes a drag
 const WHEEL_LINE_HEIGHT = 16; // px per "line" when a wheel event reports deltaMode 1
@@ -62,10 +69,17 @@ const WHEEL_VELOCITY_SCALE = 0.0037; // converts a wheel event's px delta into a
 // a full spare cycle of rendered content on either side of the visible window.
 const REPEAT_COUNT = 3;
 
+// Floors the width used for size/spacing scaling at CHROME_BREAKPOINT, so
+// below that (mobile) the row stops shrinking and the viewport clips it
+// instead — see the comment above CHROME_BREAKPOINT's declaration.
+function scalingWidth(viewportWidth: number): number {
+  return Math.max(viewportWidth, CHROME_BREAKPOINT);
+}
+
 function sleeveSizeForViewport(viewportWidth: number): number {
-  if (viewportWidth >= DESKTOP_BREAKPOINT) return SLEEVE_SIZE;
-  const scaled = SLEEVE_SIZE * (viewportWidth / DESKTOP_BREAKPOINT);
-  return Math.max(MIN_SLEEVE_SIZE, scaled);
+  const width = scalingWidth(viewportWidth);
+  if (width >= DESKTOP_BREAKPOINT) return SLEEVE_SIZE;
+  return SLEEVE_SIZE * (width / DESKTOP_BREAKPOINT);
 }
 
 export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
@@ -119,7 +133,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       const nextSleeveSize = sleeveSizeForViewport(window.innerWidth);
       setSleeveSize((prev) => (prev === nextSleeveSize ? prev : nextSleeveSize));
 
-      const spacingPx = window.innerWidth * SPACING_VW;
+      const spacingPx = scalingWidth(window.innerWidth) * SPACING_VW;
       spacing.current = spacingPx;
       const gapPx = spacingPx - SPINE_WIDTH;
       track.style.gap = `${gapPx}px`;
