@@ -33,9 +33,22 @@ interface AlbumSleeveProps {
 // front cover plane and a second, parallel back-cover plane offset by the
 // sleeve's real thickness (SPINE_WIDTH) along its own depth axis, with
 // spine/far/top/bottom faces filling the gap between their matching edges.
-// Every non-spine/far face is rendered as a normal-flipped pair (scaleZ(-1),
-// geometry unchanged) so it stays visible whichever side of the scene's
-// fixed vanishing point the sleeve has scrolled to.
+// Faces are left at the default backface-visibility (visible) rather than
+// hidden — hiding backfaces relies on the browser picking the correctly-
+// oriented copy per-face, which this scene's shared off-center perspective
+// gets wrong for sleeves on one side of the vanishing point, silently
+// dropping their edge/back geometry.
+//
+// The back-facing geometry (far edge, top/bottom walls, back cover) is a
+// real box interior: for sleeves left of the scene's single shared vanishing
+// point, the camera ends up sitting past the back cover's own plane, so true
+// 3D depth genuinely puts it nearer the camera than the front cover — DOM
+// order alone can't override that once both are real siblings in the same
+// preserve-3d context, because Chromium depth-sorts siblings there instead
+// of always deferring to paint order. Wrapping that geometry in a plain
+// (non-preserve-3d) group flattens it into one layer *before* it competes
+// with the front cover, so the front cover — a later sibling of the group,
+// not of the individual back faces — reliably wins on both sides.
 export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
   const faceStyle: CSSProperties = {
     width: size,
@@ -44,7 +57,6 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
     backgroundImage: ARTWORK_OVERLAY,
     borderColor: "var(--surface-border)",
     transformOrigin: "left top",
-    backfaceVisibility: "hidden",
   };
 
   // Same footprint as the front face, translated along its own (already
@@ -66,7 +78,6 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
     backgroundColor: EDGE_COLOR,
     borderColor: "var(--surface-border)",
     transformOrigin: "left top",
-    backfaceVisibility: "hidden",
   };
 
   return (
@@ -99,22 +110,24 @@ export function AlbumSleeve({ album, size, onSelect }: AlbumSleeveProps) {
           then folds the panel flat so it bridges the front/back faces' top
           edges instead of duplicating the faces' own vertical plane. */}
       <div className="absolute left-0 top-0 border" style={{ ...edgeWallStyle, transform: "rotateY(90deg) rotateX(90deg)" }} />
-      <div className="absolute left-0 top-0 border" style={{ ...edgeWallStyle, transform: "rotateY(90deg) rotateX(90deg) scaleZ(-1)" }} />
       {/* Bottom wall — identical geometry, shifted down by the full face
           height so it bridges the bottom edges instead. */}
       <div className="absolute left-0 border" style={{ ...edgeWallStyle, top: size, transform: "rotateY(90deg) rotateX(90deg)" }} />
-      <div className="absolute left-0 border" style={{ ...edgeWallStyle, top: size, transform: "rotateY(90deg) rotateX(90deg) scaleZ(-1)" }} />
 
-      {/* Back cover: the front face's plane translated by the real sleeve
-          thickness along its own post-rotation depth axis. */}
-      <div className="absolute left-0 top-0 border" style={{ ...backFaceStyle, transform: `rotateY(90deg) translateZ(${SPINE_WIDTH}px)` }} />
-      <div className="absolute left-0 top-0 border" style={{ ...backFaceStyle, transform: `rotateY(90deg) translateZ(${SPINE_WIDTH}px) scaleZ(-1)` }} />
+      {/* Back cover, alone, in a flat (non-preserve-3d) wrapper: it's the
+          one face large enough that Chromium's true depth-sort (see the
+          comment above this component) can flip it in front of the front
+          cover; the thin far/top/bottom edges stay true preserve-3d
+          siblings of the front cover so their real depth-sorted seam against
+          it — the lit edge line along the taper — still renders. */}
+      <div className="absolute inset-0">
+        <div className="absolute left-0 top-0 border" style={{ ...backFaceStyle, transform: `rotateY(90deg) translateZ(${SPINE_WIDTH}px)` }} />
+      </div>
 
       {/* Front cover (the album artwork) extends backward from the spine
-          into -Z; drawn last in DOM order so it reliably occludes the
-          back/edge geometry behind it even where 3D sort order is ambiguous. */}
+          into -Z; a later sibling of the interior group above so it always
+          occludes it, on both sides of the scene's fixed vanishing point. */}
       <div className="absolute left-0 top-0 border" style={{ ...faceStyle, transform: "rotateY(90deg)" }} />
-      <div className="absolute left-0 top-0 border" style={{ ...faceStyle, transform: "rotateY(90deg) scaleZ(-1)" }} />
     </div>
   );
 }
