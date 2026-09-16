@@ -16,6 +16,12 @@
   --surface-strong: #fffffff2;
   /* Kept in sync with EASE_OUT_SUBTLE in src/lib/motion.ts */
   --ease-out-subtle: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Desktop header/footer chrome: page padding (py-9) + fixed row height.
+     Kept in sync with Header.tsx/GlobalPlayerBar.tsx's md:h-[var(--pfm-chrome-row-h)]
+     and App.tsx's py-9 — FocusedAlbum insets by (pad + row) on each edge so
+     its central container is exactly bounded between the real header and footer. */
+  --pfm-chrome-row-h: 80px;
+  --pfm-chrome-pad: 36px;
 }
 
 html,
@@ -57,6 +63,32 @@ body {
   .pfm-fluid {
     transition-duration: 1ms;
   }
+}
+
+/* Slower and more deliberate than .pfm-interactive's hover/active speed — the
+   active track number swapping to full brightness should read as a
+   considered "now playing" cue, not a hover-speed flicker. */
+.pfm-track-number {
+  transition-property: color;
+  transition-duration: 320ms;
+  transition-timing-function: var(--ease-out-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pfm-track-number {
+    transition-duration: 1ms;
+  }
+}
+
+/* Hides the scrollbar on the desktop tracklist scroll region — the gradient
+   masks communicate scrollability instead, matching the Figma "Track Mask". */
+.pfm-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pfm-no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .pfm-slider-input {

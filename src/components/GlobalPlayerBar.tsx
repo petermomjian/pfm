@@ -31,7 +31,7 @@ export function GlobalPlayerBar() {
         : VolumeMinIcon;
 
   return (
-    <div className="flex w-full items-center justify-between pointer-events-auto">
+    <div className="flex w-full items-center justify-between pointer-events-auto md:h-[var(--pfm-chrome-row-h)]">
       <div className="flex flex-1 min-w-0 items-center gap-4">
         <button
           type="button"

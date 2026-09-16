@@ -96,7 +96,9 @@ export function SeekBar({ currentTime, duration, onSeek, disabled = false, alway
           // flex/fr-grow tracks playback position 1:1 with no transition — it already updates every timeupdate
           // tick, and easing that on top produces a stair-step/rubber-band stutter instead of smooth motion
           gridTemplateColumns: isPressed
-            ? `minmax(0,${percent}fr) minmax(0,${100 - percent}fr)`
+            ? percent <= 0 || percent >= 100
+              ? "minmax(0,1fr)"
+              : `minmax(0,${percent}fr) minmax(0,${100 - percent}fr)`
             : percent <= 0
               ? "auto minmax(0,1fr)"
               : percent >= 100
