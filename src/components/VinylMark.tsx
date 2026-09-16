@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ICON_SWAP_TRANSITION } from "@/lib/motion";
 
 interface VinylMarkProps {
   size: number;
@@ -113,10 +115,9 @@ function useVinylRotation(spinning: boolean) {
 // Plain placeholder disc shown when there's no track loaded — the detailed
 // Figma vinyl implies a record is actually on the platter, so an idle player
 // falls back to this flat mark instead.
-function FlatVinylMark({ size, className }: { size: number; className?: string }) {
+function FlatVinylMark({ size }: { size: number }) {
   return (
     <div
-      className={className}
       style={{
         width: size,
         height: size,
@@ -170,102 +171,127 @@ export function VinylMark({
 }: VinylMarkProps) {
   const scale = size / BASE_SIZE;
   const { textureRef, artworkRef } = useVinylRotation(spinning);
+  const reduceMotion = useReducedMotion();
 
-  if (flat) {
-    return <FlatVinylMark size={size} className={className} />;
-  }
+  const crossfadeTransition = reduceMotion ? { duration: 0.1 } : ICON_SWAP_TRANSITION;
 
   return (
     <div
       className={className}
       style={{ width: size, height: size, position: "relative", flexShrink: 0, ...SIZE_TRANSITION }}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: BASE_SIZE,
-          height: BASE_SIZE,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          ...SCALE_TRANSITION,
-        }}
-      >
-        <div className="absolute left-0 top-0 size-[512px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/background.svg`} />
-        </div>
-        <div className="absolute left-[11px] top-[11px] size-[490px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/surface.svg`} />
-        </div>
-        <div className="absolute left-[26px] top-[26px] size-[460px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-1.svg`} />
-        </div>
-        <div className="absolute left-[48px] top-[48px] size-[416px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-2.svg`} />
-        </div>
-        <div className="absolute left-[76px] top-[76px] size-[360px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-3.svg`} />
-        </div>
-        <div className="absolute left-[96px] top-[96px] size-[320px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-4.svg`} />
-        </div>
-        <div className="absolute left-[120px] top-[120px] size-[272px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-5.svg`} />
-        </div>
-
-        <div className="absolute left-[11px] top-[11px] size-[490px] mix-blend-exclusion">
-          <div className="relative size-[490px]">
-            <div className="absolute inset-[48.37%_48.37%_5.07%_-1.59%]">
-              <img alt="" className="block size-full max-w-none" src={`${ASSET_BASE}/highlight-tl.png`} />
-            </div>
-          </div>
-        </div>
-        <div className="absolute left-[11px] top-[11px] size-[490px] mix-blend-exclusion">
-          <div className="relative size-[490px]">
-            <div className="absolute inset-[5.07%_-1.59%_48.37%_48.37%]">
-              <img alt="" className="block size-full max-w-none" src={`${ASSET_BASE}/highlight-br.png`} />
-            </div>
-          </div>
-        </div>
-
-        {/* "Rotate" group: a stationary, non-transformed wrapper so the two
-            spinning children below stay direct siblings of the static
-            layers above. Each blend-mode layer's own transform must live on
-            the SAME element as its mix-blend-mode — a transformed ancestor
-            would create a new stacking context and cut the blend off from
-            the Background/Surface/Ridges/Highlights it needs to see. The
-            spinning circle is a perfect incircle of its square source image,
-            so rotating only the image (not its clipped/bordered container)
-            is pixel-identical at every angle while keeping the border
-            un-blended, exactly as authored in Figma. */}
-        <div className="absolute left-[11px] top-[11px] size-[490px]">
-          <div className="absolute left-0 top-0 size-[490px] overflow-clip rounded-[99999px] border border-[var(--surface)]">
-            <img
-              ref={textureRef}
-              alt=""
-              className="pointer-events-none absolute inset-0 size-full max-w-none object-cover mix-blend-overlay"
-              src={`${ASSET_BASE}/texture.png`}
-            />
-          </div>
-          <div
-            ref={artworkRef}
-            className="absolute left-[165px] top-[165px] size-[160px] overflow-clip rounded-[999px]"
+      {/* Crossfades between the flat placeholder and the detailed vinyl
+          instead of an abrupt swap when a track starts/stops loading. */}
+      <AnimatePresence initial={false}>
+        {flat ? (
+          <motion.div
+            key="flat"
+            className="absolute inset-0"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={crossfadeTransition}
           >
-            <img alt="" className="absolute inset-0 size-full max-w-none object-cover" src={artworkSrc} />
-            <div className="absolute inset-0 rounded-[inherit] shadow-[inset_0px_2px_4px_0px_rgba(255,255,255,0.25),inset_0px_-2px_4px_0px_rgba(0,0,0,0.25)]" />
-          </div>
-        </div>
+            <FlatVinylMark size={size} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="detailed"
+            className="absolute inset-0"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={crossfadeTransition}
+          >
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: BASE_SIZE,
+                height: BASE_SIZE,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                ...SCALE_TRANSITION,
+              }}
+            >
+              <div className="absolute left-0 top-0 size-[512px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/background.svg`} />
+              </div>
+              <div className="absolute left-[11px] top-[11px] size-[490px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/surface.svg`} />
+              </div>
+              <div className="absolute left-[26px] top-[26px] size-[460px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-1.svg`} />
+              </div>
+              <div className="absolute left-[48px] top-[48px] size-[416px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-2.svg`} />
+              </div>
+              <div className="absolute left-[76px] top-[76px] size-[360px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-3.svg`} />
+              </div>
+              <div className="absolute left-[96px] top-[96px] size-[320px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-4.svg`} />
+              </div>
+              <div className="absolute left-[120px] top-[120px] size-[272px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/ridge-5.svg`} />
+              </div>
 
-        <div className="absolute left-[232px] top-[232px] size-[48px]">
-          <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/highlight-spindle.svg`} />
-        </div>
-        <div className="absolute left-[248px] top-[248px] size-[16px]">
-          <div className="absolute inset-[-6.25%]">
-            <img alt="" className="block size-full max-w-none" src={`${ASSET_BASE}/highlight-dot.svg`} />
-          </div>
-        </div>
-      </div>
+              <div className="absolute left-[11px] top-[11px] size-[490px] mix-blend-exclusion">
+                <div className="relative size-[490px]">
+                  <div className="absolute inset-[48.37%_48.37%_5.07%_-1.59%]">
+                    <img alt="" className="block size-full max-w-none" src={`${ASSET_BASE}/highlight-tl.png`} />
+                  </div>
+                </div>
+              </div>
+              <div className="absolute left-[11px] top-[11px] size-[490px] mix-blend-exclusion">
+                <div className="relative size-[490px]">
+                  <div className="absolute inset-[5.07%_-1.59%_48.37%_48.37%]">
+                    <img alt="" className="block size-full max-w-none" src={`${ASSET_BASE}/highlight-br.png`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* "Rotate" group: a stationary, non-transformed wrapper so the two
+                  spinning children below stay direct siblings of the static
+                  layers above. Each blend-mode layer's own transform must live on
+                  the SAME element as its mix-blend-mode — a transformed ancestor
+                  would create a new stacking context and cut the blend off from
+                  the Background/Surface/Ridges/Highlights it needs to see. The
+                  spinning circle is a perfect incircle of its square source image,
+                  so rotating only the image (not its clipped/bordered container)
+                  is pixel-identical at every angle while keeping the border
+                  un-blended, exactly as authored in Figma. */}
+              <div className="absolute left-[11px] top-[11px] size-[490px]">
+                <div className="absolute left-0 top-0 size-[490px] overflow-clip rounded-[99999px] border border-[var(--surface)]">
+                  <img
+                    ref={textureRef}
+                    alt=""
+                    className="pointer-events-none absolute inset-0 size-full max-w-none object-cover mix-blend-overlay"
+                    src={`${ASSET_BASE}/texture.png`}
+                  />
+                </div>
+                <div
+                  ref={artworkRef}
+                  className="absolute left-[165px] top-[165px] size-[160px] overflow-clip rounded-[999px]"
+                >
+                  <img alt="" className="absolute inset-0 size-full max-w-none object-cover" src={artworkSrc} />
+                  <div className="absolute inset-0 rounded-[inherit] shadow-[inset_0px_2px_4px_0px_rgba(255,255,255,0.25),inset_0px_-2px_4px_0px_rgba(0,0,0,0.25)]" />
+                </div>
+              </div>
+
+              <div className="absolute left-[232px] top-[232px] size-[48px]">
+                <img alt="" className="absolute inset-0 block size-full max-w-none" src={`${ASSET_BASE}/highlight-spindle.svg`} />
+              </div>
+              <div className="absolute left-[248px] top-[248px] size-[16px]">
+                <div className="absolute inset-[-6.25%]">
+                  <img alt="" className="block size-full max-w-none" src={`${ASSET_BASE}/highlight-dot.svg`} />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
