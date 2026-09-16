@@ -207,9 +207,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Holding the native range thumb (or an arrow key) at the far edge repeatedly
+  // maps to the track's max, i.e. its duration — and the browser fires `ended`
+  // the instant `currentTime` reaches `duration`. That advances to the next
+  // track mid-drag, which the still-held pointer/key immediately re-triggers
+  // against the new track's (shorter) max, cascading through the whole album.
+  // Clamping just shy of the end lets a manual scrub approach but never reach
+  // the exact end, so only real playback completion fires `ended`.
+  const durationRef = useRef(0);
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
   const seek = useCallback((time: number) => {
-    setCurrentTime(time);
-    pendingSeekRef.current = time;
+    const dur = durationRef.current;
+    const clamped = dur > 0 ? Math.min(time, Math.max(0, dur - 0.15)) : time;
+    setCurrentTime(clamped);
+    pendingSeekRef.current = clamped;
     if (seekRafRef.current == null) {
       seekRafRef.current = requestAnimationFrame(() => {
         seekRafRef.current = null;

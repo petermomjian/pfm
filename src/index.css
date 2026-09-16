@@ -28,10 +28,16 @@ html,
 body,
 #root {
   height: 100%;
+  overscroll-behavior: none;
+}
+
+html {
+  touch-action: pan-x pan-y;
 }
 
 body {
   margin: 0;
+  overflow: hidden;
   background-color: var(--background);
   color: var(--foreground);
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;

@@ -48,7 +48,7 @@ function AppShell() {
   const focusedAlbum = view.screen === "focused" ? albums.find((a) => a.id === view.albumId) : undefined;
 
   return (
-    <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground">
+    <div className="relative h-dvh w-screen overflow-hidden bg-background text-foreground">
       <Stage view={view} onSelect={onSelect} onBack={onBack} isMobile={isMobile} />
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center">

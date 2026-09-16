@@ -57,7 +57,7 @@ export function MobileTransportBar({ onSelectAlbum }: MobileTransportBarProps) {
           disabled={!album}
           className="pfm-interactive flex shrink-0 items-center justify-center rounded-full hover:scale-110 active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none"
         >
-          <VinylMark size={36} spinning={isAudioPlaying} flat={!track} />
+          <VinylMark size={36} spinning={isAudioPlaying} flat={!track} artworkSrc={album?.coverArtVinyl} />
         </button>
       </div>
 

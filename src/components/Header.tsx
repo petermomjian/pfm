@@ -65,7 +65,7 @@ export function Header({ onSelectAlbum }: HeaderProps) {
             )}
           </AnimatePresence>
         </div>
-        <VinylMark size={80} spinning={isAudioPlaying} flat={!track} />
+        <VinylMark size={80} spinning={isAudioPlaying} flat={!track} artworkSrc={album?.coverArtVinyl} />
       </button>
     </div>
   );
