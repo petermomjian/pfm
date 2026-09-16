@@ -6,7 +6,7 @@ import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from "./icons/Tran
 import { MuteIcon, VolumeIcon } from "./icons/VolumeIcons";
 
 const GHOST_BUTTON =
-  "pfm-interactive flex flex-1 h-20 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30";
+  "pfm-interactive flex flex-1 h-16 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30";
 
 export function MobileTransportBar() {
   const {
@@ -27,7 +27,7 @@ export function MobileTransportBar() {
   const VolumeGlyph = isMuted ? MuteIcon : VolumeIcon;
 
   return (
-    <div className="pointer-events-auto flex w-full flex-col gap-6">
+    <div className="pointer-events-auto flex w-full flex-col gap-4">
       <div className="flex w-full items-center gap-6">
         <button
           type="button"
@@ -60,7 +60,7 @@ export function MobileTransportBar() {
           aria-label={isPlaying ? "Pause" : "Play"}
           onClick={togglePlay}
           disabled={!track}
-          className="pfm-interactive flex h-20 flex-1 items-center justify-center rounded-full border border-[var(--border-input)] text-foreground hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:border-[var(--surface-border)] focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
+          className="pfm-interactive flex h-16 flex-1 items-center justify-center rounded-full border border-[var(--border-input)] text-foreground hover:bg-[var(--surface)] active:bg-transparent active:opacity-60 focus-visible:outline-none focus-visible:border-[var(--surface-border)] focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none disabled:opacity-30"
         >
           <IconSwap id={isPlaying ? "pause" : "play"} size={24} scale={0.4} blur={10}>
             {isPlaying ? <PauseIcon size={24} /> : <PlayIcon size={24} />}

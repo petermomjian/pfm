@@ -20,7 +20,7 @@ export function BackToLibrary({ title, onBack, className }: BackToLibraryProps) 
         type="button"
         aria-label="Back to library"
         onClick={onBack}
-        className="pfm-interactive flex size-9 -translate-x-3.5 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
+        className="pfm-interactive flex size-9 -translate-x-3.5 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] max-md:translate-x-0.5"
       >
         <ArrowLeft size={16} />
       </button>

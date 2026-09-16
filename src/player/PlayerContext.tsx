@@ -48,8 +48,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
+  const [muted, setMuted] = useState(false);
   const previousVolumeRef = useRef(0.8);
-  const isMuted = volume === 0;
+  const isMuted = muted || volume === 0;
 
   // Set whenever one track hands off to another (auto-advance, Next/Prev, or
   // picking a different track) while the platter was already spinning, so
@@ -113,6 +114,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // iOS Safari ignores script writes to `.volume` (hardware volume buttons
+  // are the only control) — `.muted` is the only reliable way to silence
+  // playback on that platform, so mute state is applied through it directly
+  // rather than by zeroing `.volume`.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.muted = isMuted;
+  }, [isMuted]);
 
   // The native `timeupdate` event fires only a handful of times per second,
   // which reads as visible steps in the seek bar's position and label —
@@ -199,13 +209,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const toggleMute = useCallback(() => {
     if (!audioRef.current) return;
-    if (volume > 0) {
-      previousVolumeRef.current = volume;
-      setVolume(0);
+    if (isMuted) {
+      setMuted(false);
+      if (volume === 0) setVolume(previousVolumeRef.current || 0.8);
     } else {
-      setVolume(previousVolumeRef.current || 0.8);
+      setMuted(true);
     }
-  }, [volume, setVolume]);
+  }, [isMuted, volume, setVolume]);
 
   const value = useMemo<PlayerContextValue>(
     () => ({

@@ -47,7 +47,7 @@ function AppShell() {
   const focusedAlbum = view.screen === "focused" ? albums.find((a) => a.id === view.albumId) : undefined;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground">
       <Stage
         view={view}
         onSelect={(albumId) => setView({ screen: "focused", albumId })}
@@ -56,7 +56,10 @@ function AppShell() {
       />
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center">
-        <div className="pfm-fluid flex h-full w-full max-w-[1920px] flex-col justify-between px-6 py-9 md:px-16">
+        {isMobile && focusedAlbum && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-48 bg-gradient-to-b from-transparent to-black" />
+        )}
+        <div className="pfm-fluid relative z-20 flex h-full w-full max-w-[1920px] flex-col justify-between px-6 py-9 md:px-16">
           {isMobile && focusedAlbum ? (
             <div className="pointer-events-auto flex w-full items-center justify-start">
               <BackToLibrary title={focusedAlbum.title} onBack={onBack} />
