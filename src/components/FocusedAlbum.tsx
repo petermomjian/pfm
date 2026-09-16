@@ -154,6 +154,7 @@ export function FocusedAlbum({ album, onBack, isMobile }: FocusedAlbumProps) {
         <VinylMark
           size={isMobile ? MOBILE_VINYL_SIZE : desktopVinylSize}
           spinning={Boolean(isThisAlbumPlaying && isAudioPlaying)}
+          artworkSrc={album.coverArt}
           className="shrink-0"
         />
         <div

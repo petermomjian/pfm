@@ -57,7 +57,9 @@ export function AlbumSleeve({ album, size, onSelect, raised = false }: AlbumSlee
     width: size,
     height: size,
     backgroundColor: "var(--surface)",
-    backgroundImage: ARTWORK_OVERLAY,
+    backgroundImage: `${ARTWORK_OVERLAY}, url(${album.coverArt})`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
     borderColor: "var(--surface-border)",
     transformOrigin: "left top",
   };
