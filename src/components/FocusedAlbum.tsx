@@ -120,7 +120,7 @@ export function FocusedAlbum({ album, onBack, isMobile }: FocusedAlbumProps) {
   }, [album.id]);
 
   return (
-    <div className="pfm-fluid absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-48 pt-24 md:overflow-hidden md:px-0 md:py-[calc(var(--pfm-chrome-pad)_+_var(--pfm-chrome-row-h))]">
+    <div className="pfm-fluid absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-48 pt-24 md:overflow-hidden md:px-16 md:py-[calc(var(--pfm-chrome-pad)_+_var(--pfm-chrome-row-h))]">
       <div
         ref={rowRef}
         className="flex w-full flex-col items-center gap-8 md:h-full md:flex-row md:items-center md:justify-center md:gap-16"
@@ -132,7 +132,7 @@ export function FocusedAlbum({ album, onBack, isMobile }: FocusedAlbumProps) {
         />
         <div
           ref={infoRef}
-          className="flex w-full flex-col items-start justify-center gap-2.5 md:h-full md:w-auto"
+          className="flex w-full flex-col items-start justify-center gap-2.5 md:h-full md:w-auto md:min-w-64"
         >
           <div className="hidden shrink-0 items-start pb-4 md:flex">
             <BackToLibrary title={album.title} onBack={onBack} />
