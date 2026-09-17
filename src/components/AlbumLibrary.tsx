@@ -162,6 +162,14 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     []
   );
 
+  // The tick loop below only keeps requesting frames while something is
+  // actually moving (drag in progress or momentum still decaying) — see its
+  // shouldContinue check. Anything that sets velocity/dragging from outside
+  // that loop (pointer down, wheel, arrow keys, a resize nudging x.current)
+  // needs to kick it awake again if it had gone idle; this ref holds the
+  // loop's own restart function once the effect below defines it.
+  const wakeLoop = useRef<() => void>(() => {});
+
   useEffect(() => {
     const measure = () => {
       const viewport = viewportRef.current;
@@ -221,6 +229,12 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
           end: Math.min(repeatedCount - 1, center + radius),
         });
       }
+
+      // x.current may have just moved (see the resize-preservation branch
+      // above) while the tick loop was idle — nudge it awake so the new
+      // position actually reaches the DOM instead of waiting for the next
+      // drag/momentum to happen to touch it.
+      wakeLoop.current();
     };
     measure();
     window.addEventListener("resize", measure);
@@ -228,7 +242,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   }, []);
 
   useEffect(() => {
-    let frame: number;
+    let frame: number | null = null;
     let lastTime = performance.now();
 
     // Keeps x.current within half a cycle of baseX. Since every copy of the
@@ -343,11 +357,30 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       if (track) track.style.transform = transform;
       if (metaTrack) metaTrack.style.transform = transform;
 
+      // Nothing left to animate — drop out of the rAF loop instead of
+      // spending a frame's worth of main-thread time (this tick, plus the
+      // z-index rewrite over every sleeve above) 60 times a second while the
+      // carousel just sits there. Idling forever unconditionally was stealing
+      // scheduling headroom from native scrolling elsewhere in the app (the
+      // tracklist, page scroll) even when this screen wasn't being touched.
+      // wakeLoop (below) restarts it the moment something moves again.
+      if (dragging.current || velocity.current !== 0) {
+        frame = requestAnimationFrame(tick);
+      } else {
+        frame = null;
+      }
+    };
+
+    wakeLoop.current = () => {
+      if (frame != null) return;
+      lastTime = performance.now();
       frame = requestAnimationFrame(tick);
     };
 
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      if (frame != null) cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
@@ -361,6 +394,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       // this is what smooths out the harsh per-notch step of a standard mouse
       // wheel into eased motion, matching drag-release momentum.
       velocity.current += -delta * WHEEL_VELOCITY_SCALE;
+      wakeLoop.current();
     };
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
@@ -375,6 +409,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     lastPointerTime.current = performance.now();
     velocity.current = 0;
     (e.target as Element).setPointerCapture?.(e.pointerId);
+    wakeLoop.current();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -408,6 +443,8 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowRight") velocity.current = -6;
     else if (e.key === "ArrowLeft") velocity.current = 6;
+    else return;
+    wakeLoop.current();
   };
 
   return (

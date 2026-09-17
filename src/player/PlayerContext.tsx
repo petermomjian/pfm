@@ -27,6 +27,8 @@ interface PlayerContextValue extends PlayerState {
   next: () => void;
   prev: () => void;
   seek: (time: number) => void;
+  beginSeek: () => void;
+  endSeek: () => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
 }
@@ -72,6 +74,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // controls should be visible as a ramp up/down.
   const isAdvancingRef = useRef(false);
 
+  // Set while the seek bar is being scrubbed. Playback keeps running in the
+  // background during a drag, so holding the thumb near the end for any
+  // stretch of real time lets the audio actually reach its end and fire a
+  // genuine `ended` mid-drag, auto-advancing without the pointer ever being
+  // released. Scrubbing pauses the element for the duration of the drag (see
+  // beginSeek/endSeek below) so no real time elapses to trigger that, and
+  // this flag keeps that pause from reading as a visible stop, the same way
+  // isAdvancingRef hides the pause/waiting churn of a track handoff.
+  const isScrubbingRef = useRef(false);
+
   useEffect(() => {
     const audio = new Audio();
     audio.volume = volume;
@@ -97,7 +109,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       // before the `ended` event itself, i.e. before onEnded below has had a
       // chance to raise isAdvancingRef — check the same "about to auto-
       // advance" condition here too, or this pause reads as a real stop.
-      if (isAdvancingRef.current) return;
+      if (isAdvancingRef.current || isScrubbingRef.current) return;
       if (audio.ended && hasNextTrackRef.current) return;
       setIsAudioPlaying(false);
     };
@@ -248,6 +260,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Pauses actual playback for the duration of a scrub so holding the thumb
+  // near the end can't run the real clock out and trigger a genuine `ended`
+  // (see isScrubbingRef above). The transport's play/pause intent (`isPlaying`)
+  // is untouched, so the UI keeps reading as playing throughout the drag.
+  const beginSeek = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    isScrubbingRef.current = true;
+    audio.pause();
+  }, []);
+
+  const endSeek = useCallback(() => {
+    const audio = audioRef.current;
+    isScrubbingRef.current = false;
+    if (!audio) return;
+    if (seekRafRef.current != null) {
+      cancelAnimationFrame(seekRafRef.current);
+      seekRafRef.current = null;
+    }
+    if (pendingSeekRef.current != null) {
+      audio.currentTime = pendingSeekRef.current;
+      pendingSeekRef.current = null;
+    }
+    if (isPlaying) audio.play();
+  }, [isPlaying]);
+
   // iOS/Android lock-screen and Control Center now-playing card: cover art,
   // title, and artist come from the current track, and the native transport
   // buttons there call back into the same play/pause/next/prev/seek used
@@ -356,6 +394,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       next,
       prev,
       seek,
+      beginSeek,
+      endSeek,
       setVolume,
       toggleMute,
     }),
@@ -373,6 +413,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       next,
       prev,
       seek,
+      beginSeek,
+      endSeek,
       setVolume,
       toggleMute,
     ],

@@ -17,6 +17,8 @@ export function GlobalPlayerBar() {
     next,
     prev,
     seek,
+    beginSeek,
+    endSeek,
     setVolume,
     toggleMute,
   } = usePlayer();
@@ -88,7 +90,14 @@ export function GlobalPlayerBar() {
       </div>
 
       <div className="flex flex-1 min-w-0 items-center justify-end">
-        <SeekBar currentTime={currentTime} duration={duration} onSeek={seek} disabled={!track} />
+        <SeekBar
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={seek}
+          onSeekStart={beginSeek}
+          onSeekEnd={endSeek}
+          disabled={!track}
+        />
       </div>
     </div>
   );

@@ -46,10 +46,20 @@ function useVinylRotation(spinning: boolean) {
   const phaseRef = useRef<SpinPhase>("idle");
   const phaseStartRef = useRef(0);
   const phaseStartVelocityRef = useRef(0);
+  const rafIdRef = useRef<number | null>(null);
+
+  // Set by the loop-owning effect below; retargeting the phase (the effect
+  // just below this one) needs to be able to wake the loop back up whenever
+  // it had gone idle and stopped scheduling frames.
+  const wakeLoop = useRef<() => void>(() => {});
 
   // Retargets the phase whenever playback state changes; the actual stepping
-  // happens in the persistent loop below, which keeps running the whole time
-  // this component is mounted.
+  // happens in the loop below, which — while at least one VinylMark is
+  // mounted somewhere in the app (e.g. the mobile mini player, present the
+  // entire time the app is open) — would otherwise keep running forever even
+  // while fully at rest, spending a frame's worth of main-thread time on
+  // every vsync for no visible effect and stealing scheduling headroom from
+  // things like native scroll elsewhere on the page.
   useEffect(() => {
     phaseStartVelocityRef.current = velocityRef.current;
     phaseStartRef.current = performance.now();
@@ -61,13 +71,17 @@ function useVinylRotation(spinning: boolean) {
     } else {
       phaseRef.current = "idle";
     }
+
+    wakeLoop.current();
   }, [spinning]);
 
-  // A single rAF loop for the component's lifetime — avoids coordinating
-  // start/stop across renders (and the StrictMode double-invoke pitfall of
-  // an id ref left stale after a simulated mount/cleanup/remount).
+  // A single rAF loop for the component's lifetime, but one that stops
+  // scheduling itself once the platter is fully at rest (see the idle check
+  // at the end of step()) — avoids coordinating start/stop across renders
+  // (and the StrictMode double-invoke pitfall of an id ref left stale after a
+  // simulated mount/cleanup/remount) while not running forever regardless of
+  // whether anything is actually spinning.
   useEffect(() => {
-    let rafId: number;
     let lastFrame: number | null = null;
 
     function step(frameTime: number) {
@@ -102,11 +116,23 @@ function useVinylRotation(spinning: boolean) {
         if (artworkRef.current) artworkRef.current.style.transform = transform;
       }
 
-      rafId = requestAnimationFrame(step);
+      if (phaseRef.current !== "idle") {
+        rafIdRef.current = requestAnimationFrame(step);
+      } else {
+        rafIdRef.current = null;
+      }
     }
 
-    rafId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafId);
+    wakeLoop.current = () => {
+      if (rafIdRef.current != null) return;
+      lastFrame = null;
+      rafIdRef.current = requestAnimationFrame(step);
+    };
+
+    if (phaseRef.current !== "idle") rafIdRef.current = requestAnimationFrame(step);
+    return () => {
+      if (rafIdRef.current != null) cancelAnimationFrame(rafIdRef.current);
+    };
   }, []);
 
   return { textureRef, artworkRef };

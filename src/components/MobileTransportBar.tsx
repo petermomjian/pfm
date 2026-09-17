@@ -29,6 +29,8 @@ export function MobileTransportBar({ onSelectAlbum }: MobileTransportBarProps) {
     prev,
     toggleMute,
     seek,
+    beginSeek,
+    endSeek,
   } = usePlayer();
 
   const volumeLevel = isMuted ? "mute" : "high";
@@ -48,7 +50,15 @@ export function MobileTransportBar({ onSelectAlbum }: MobileTransportBarProps) {
           </IconSwap>
         </button>
 
-        <SeekBar currentTime={currentTime} duration={duration} onSeek={seek} disabled={!track} alwaysExpanded />
+        <SeekBar
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={seek}
+          onSeekStart={beginSeek}
+          onSeekEnd={endSeek}
+          disabled={!track}
+          alwaysExpanded
+        />
 
         <button
           type="button"

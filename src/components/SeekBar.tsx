@@ -4,6 +4,9 @@ interface SeekBarProps {
   currentTime: number;
   duration: number;
   onSeek: (time: number) => void;
+  /** Called when a scrub starts/stops, so playback can pause for the drag — see PlayerContext's beginSeek/endSeek. */
+  onSeekStart?: () => void;
+  onSeekEnd?: () => void;
   disabled?: boolean;
   /** Mobile: permanently shows what is otherwise the hover-only "track" state (no hover on touch), full width. */
   alwaysExpanded?: boolean;
@@ -26,7 +29,15 @@ const PRESS_LIFT = 16;
 // Fallback half-width (px) used until the hidden probe below measures the real one.
 const FALLBACK_HALF_LABEL_WIDTH = 17;
 
-export function SeekBar({ currentTime, duration, onSeek, disabled = false, alwaysExpanded = false }: SeekBarProps) {
+export function SeekBar({
+  currentTime,
+  duration,
+  onSeek,
+  onSeekStart,
+  onSeekEnd,
+  disabled = false,
+  alwaysExpanded = false,
+}: SeekBarProps) {
   // Tracked explicitly instead of relying on the :active/peer-active pseudo-class:
   // :active drops as soon as the pointer strays outside the element's bounds
   // mid-drag, and doesn't reliably engage at all for touch (the target device
@@ -81,12 +92,19 @@ export function SeekBar({ currentTime, duration, onSeek, disabled = false, alway
         step={0.1}
         value={currentTime}
         onChange={(e) => onSeek(Number(e.target.value))}
-        onPointerDown={() => setIsPressed(true)}
+        onPointerDown={() => {
+          setIsPressed(true);
+          onSeekStart?.();
+        }}
         onPointerUp={(e) => {
           setIsPressed(false);
+          onSeekEnd?.();
           e.currentTarget.blur();
         }}
-        onPointerCancel={() => setIsPressed(false)}
+        onPointerCancel={() => {
+          setIsPressed(false);
+          onSeekEnd?.();
+        }}
         disabled={disabled || !duration}
         aria-label="Seek"
         className="pfm-slider-input"
