@@ -106,6 +106,8 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
     backgroundImage: `${ARTWORK_OVERLAY}, url(${album.coverArt})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
+    backgroundOrigin: "border-box",
+    backgroundRepeat: "no-repeat",
     borderImage: OUTLINE_FADE_FRONT,
     transformOrigin: "left top",
     backfaceVisibility: "hidden",
@@ -130,6 +132,8 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
     height: SPINE_WIDTH,
     backgroundColor: "transparent",
     backgroundImage: EDGE_FILL_FADE,
+    backgroundOrigin: "border-box",
+    backgroundRepeat: "no-repeat",
     borderImage: OUTLINE_FADE_FRONT,
     transformOrigin: "left top",
   };

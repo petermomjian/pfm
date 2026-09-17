@@ -69,15 +69,24 @@ const WHEEL_VELOCITY_SCALE = 0.0037; // converts a wheel event's px delta into a
 // a full spare cycle of rendered content on either side of the visible window.
 const REPEAT_COUNT = 3;
 
-// Mobile-only: how many sleeves on either side of the currently-centered one
-// keep their full 3D geometry (see AlbumSleeve's `full` prop). Every sleeve in
-// the loop is mounted at once regardless of this window — it only decides
-// which ones also get their two image-textured cover layers, the actual GPU
-// memory cost. Sleeves this far from center are already heavily foreshortened
+// How many sleeves on either side of the currently-centered one keep their
+// full 3D geometry (see AlbumSleeve's `full` prop). Every sleeve in the loop
+// is mounted at once regardless of this window — it only decides which ones
+// also get their two image-textured cover layers, the actual GPU memory
+// cost. Sleeves this far from center are already heavily foreshortened
 // toward edge-on in the shared perspective, so losing their cover layers
 // isn't visible; this just caps how many full-resolution texture layers can
-// be resident at once on the budget-constrained mobile GPU.
-const ACTIVE_WINDOW_RADIUS = 6;
+// be resident at once. Mobile WebKit's per-tab GPU budget makes this a hard
+// requirement there (see DESKTOP_BREAKPOINT above); desktop GPUs have far
+// more headroom, so its radius is generous enough that the cap is normally
+// never felt, but still bounds worst-case memory use on low-end laptops
+// instead of leaving all REPEAT_COUNT * albums.length sleeves resident.
+const MOBILE_ACTIVE_WINDOW_RADIUS = 6;
+const DESKTOP_ACTIVE_WINDOW_RADIUS = 12;
+
+function activeWindowRadiusForViewport(viewportWidth: number): number {
+  return viewportWidth < CHROME_BREAKPOINT ? MOBILE_ACTIVE_WINDOW_RADIUS : DESKTOP_ACTIVE_WINDOW_RADIUS;
+}
 
 // Floors the width used for size/spacing scaling at CHROME_BREAKPOINT, so
 // below that (mobile) the row stops shrinking and the viewport clips it
@@ -114,16 +123,16 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   );
 
   const repeatedCount = REPEAT_COUNT * albums.length;
-  // Index (into repeatedAlbums) of the sleeve that gets full geometry ±
-  // ACTIVE_WINDOW_RADIUS — see ACTIVE_WINDOW_RADIUS. Only tracked/used on
-  // mobile; desktop always renders every sleeve at full geometry. Initialized
-  // to match where x.current itself initializes below (the middle copy's
-  // first album, centered on first paint).
+  // Index (into repeatedAlbums) of the sleeve that gets full geometry ± the
+  // viewport-appropriate radius — see activeWindowRadiusForViewport().
+  // Initialized to match where x.current itself initializes below (the
+  // middle copy's first album, centered on first paint).
   const [activeRange, setActiveRange] = useState(() => {
     const center = albums.length;
+    const radius = activeWindowRadiusForViewport(window.innerWidth);
     return {
-      start: Math.max(0, center - ACTIVE_WINDOW_RADIUS),
-      end: Math.min(repeatedCount - 1, center + ACTIVE_WINDOW_RADIUS),
+      start: Math.max(0, center - radius),
+      end: Math.min(repeatedCount - 1, center + radius),
     };
   });
   // -1 (not a valid repeatedAlbums index) so the first tick's change check
@@ -198,6 +207,20 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       const metaContentHeight = metaContentRef.current?.getBoundingClientRect().height ?? META_CONTENT_HEIGHT_ESTIMATE;
       const nextSleeveTop = sleeveTopForViewport(window.innerWidth, window.innerHeight, metaContentHeight);
       setSleeveTop((prev) => (prev === nextSleeveTop ? prev : nextSleeveTop));
+
+      // Re-derive the active window immediately on resize too (not just on
+      // scroll, via tick()'s lastCenterIndex check below) — otherwise
+      // crossing CHROME_BREAKPOINT without also scrolling would leave the
+      // previous viewport's radius in effect until the next scroll-driven
+      // center change.
+      if (lastCenterIndex.current >= 0) {
+        const center = lastCenterIndex.current;
+        const radius = activeWindowRadiusForViewport(window.innerWidth);
+        setActiveRange({
+          start: Math.max(0, center - radius),
+          end: Math.min(repeatedCount - 1, center + radius),
+        });
+      }
     };
     measure();
     window.addEventListener("resize", measure);
@@ -249,14 +272,13 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
         if (center !== lastCenterIndex.current) {
           lastCenterIndex.current = center;
 
-          // Mobile-only: also widen/shift the window of sleeves mounted at
-          // full geometry — see ACTIVE_WINDOW_RADIUS.
-          if (window.innerWidth < CHROME_BREAKPOINT) {
-            setActiveRange({
-              start: Math.max(0, center - ACTIVE_WINDOW_RADIUS),
-              end: Math.min(repeatedCount - 1, center + ACTIVE_WINDOW_RADIUS),
-            });
-          }
+          // Widen/shift the window of sleeves mounted at full geometry — see
+          // activeWindowRadiusForViewport().
+          const radius = activeWindowRadiusForViewport(window.innerWidth);
+          setActiveRange({
+            start: Math.max(0, center - radius),
+            end: Math.min(repeatedCount - 1, center + radius),
+          });
         }
 
         // Each sleeve is its own preserve-3d group, so nothing here gives
@@ -439,7 +461,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
               size={sleeveSize}
               onSelect={handleSelect}
               raised={key === hoveredKey}
-              full={window.innerWidth >= CHROME_BREAKPOINT || (index >= activeRange.start && index <= activeRange.end)}
+              full={index >= activeRange.start && index <= activeRange.end}
             />
           ))}
         </div>

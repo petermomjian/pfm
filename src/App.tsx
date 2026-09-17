@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { albums } from "@/data/albums";
 import { PlayerProvider, usePlayer } from "@/player/PlayerContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -39,6 +39,18 @@ function Stage({
   return <AlbumLibrary onSelect={onSelect} onPlay={handlePlay} />;
 }
 
+// Elements that already own arrow/space/etc. themselves (range inputs, buttons,
+// text inputs) — global shortcuts back off so they don't double-fire alongside
+// (or fight) the element's native key handling.
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName);
+}
+
+const SEEK_STEP_SECONDS = 5;
+const VOLUME_STEP = 0.1;
+
 function AppShell() {
   const [view, setView] = useState<View>({ screen: "library" });
   const isMobile = useIsMobile();
@@ -46,6 +58,62 @@ function AppShell() {
   const onSelect = (albumId: string) => setView({ screen: "focused", albumId });
 
   const focusedAlbum = view.screen === "focused" ? albums.find((a) => a.id === view.albumId) : undefined;
+
+  const { track, currentTime, volume, togglePlay, next, prev, seek, setVolume, toggleMute } = usePlayer();
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      switch (e.key) {
+        case " ":
+        case "Spacebar":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "Escape":
+          if (view.screen === "focused") onBack();
+          break;
+        case "ArrowRight":
+          if (track) {
+            e.preventDefault();
+            seek(currentTime + SEEK_STEP_SECONDS);
+          }
+          break;
+        case "ArrowLeft":
+          if (track) {
+            e.preventDefault();
+            seek(currentTime - SEEK_STEP_SECONDS);
+          }
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setVolume(Math.min(1, volume + VOLUME_STEP));
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          setVolume(Math.max(0, volume - VOLUME_STEP));
+          break;
+        case "m":
+        case "M":
+          toggleMute();
+          break;
+        case "n":
+        case "N":
+          if (track) next();
+          break;
+        case "p":
+        case "P":
+          if (track) prev();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [view.screen, track, currentTime, volume, togglePlay, next, prev, seek, setVolume, toggleMute]);
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-background text-foreground">
