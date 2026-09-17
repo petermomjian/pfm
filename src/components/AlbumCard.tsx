@@ -39,6 +39,16 @@ interface AlbumSleeveProps {
   // True while the matching AlbumMeta's title or play button is hovered —
   // lifts the sleeve to echo that hover back onto the artwork.
   raised?: boolean;
+  // False for sleeves scrolled far from the currently-centered position (see
+  // AlbumLibrary's activeRange windowing). The front/back cover planes are
+  // each a full-resolution image texture composited as its own GPU layer —
+  // with every sleeve in the loop mounted at once, that's the memory that
+  // exceeds mobile WebKit's per-tab GPU budget and crashes the tab. Distant
+  // sleeves are also nearly edge-on in the shared perspective, so skipping
+  // just these two layers there is visually unnoticeable. Every other
+  // face (spine, edges, top/bottom walls) stays mounted regardless, so
+  // layout/spacing math never depends on this flag.
+  full?: boolean;
 }
 
 // Builds the sleeve as a true 6-sided box in the shared preserve-3d scene: a
@@ -60,7 +70,7 @@ interface AlbumSleeveProps {
 // remaining ambiguity for Chromium's true 3D depth-sort to get wrong, so
 // unlike the thin edge faces, the covers don't need a flattened wrapper to
 // force paint order.
-export function AlbumSleeve({ album, size, onSelect, raised = false }: AlbumSleeveProps) {
+export function AlbumSleeve({ album, size, onSelect, raised = false, full = true }: AlbumSleeveProps) {
   // Ties the spine's fill to the artwork's own outer-edge color so the sleeve
   // reads as continuous with the cover instead of a fixed neutral fill.
   const spineColor = useEdgeColor(album.coverArt, "var(--surface)");
@@ -141,24 +151,33 @@ export function AlbumSleeve({ album, size, onSelect, raised = false }: AlbumSlee
           height so it bridges the bottom edges instead. */}
       <div className="absolute left-0 border" style={{ ...edgeWallStyle, top: size, transform: "rotateY(90deg) rotateX(90deg)" }} />
 
-      {/* Back cover: rotateY(270deg) gives it the opposite outward normal
-          (-X) from the front cover's (+X), so it hinges from the spine's own
-          near edge (x=0, no X offset) rather than the front cover's — its
-          near edge lands on the box's -X wall, the side its normal actually
-          points toward, instead of sharing the front cover's hinge line. */}
-      <div
-        className="absolute left-0 top-0 border"
-        style={{ ...backFaceStyle, transform: `translateZ(-${size}px) rotateY(270deg)` }}
-      />
+      {/* Back/front cover — the two image-textured GPU layers, skipped
+          entirely (not just hidden) when `full` is false. See the `full`
+          prop's doc comment above. */}
+      {full && (
+        <>
+          {/* Back cover: rotateY(270deg) gives it the opposite outward normal
+              (-X) from the front cover's (+X), so it hinges from the spine's
+              own near edge (x=0, no X offset) rather than the front cover's —
+              its near edge lands on the box's -X wall, the side its normal
+              actually points toward, instead of sharing the front cover's
+              hinge line. */}
+          <div
+            className="absolute left-0 top-0 border"
+            style={{ ...backFaceStyle, transform: `translateZ(-${size}px) rotateY(270deg)` }}
+          />
 
-      {/* Front cover: the album artwork, extending backward from the spine
-          into -Z. Hinges from the far (+X) edge of the spine — the side its
-          rotateY(90deg) normal (+X) actually points toward — so each cover's
-          near edge sits on the wall its own normal faces, not its sibling's. */}
-      <div
-        className="absolute left-0 top-0 border"
-        style={{ ...faceStyle, transform: `translateX(${SPINE_WIDTH}px) rotateY(90deg)` }}
-      />
+          {/* Front cover: the album artwork, extending backward from the
+              spine into -Z. Hinges from the far (+X) edge of the spine — the
+              side its rotateY(90deg) normal (+X) actually points toward — so
+              each cover's near edge sits on the wall its own normal faces,
+              not its sibling's. */}
+          <div
+            className="absolute left-0 top-0 border"
+            style={{ ...faceStyle, transform: `translateX(${SPINE_WIDTH}px) rotateY(90deg)` }}
+          />
+        </>
+      )}
     </div>
   );
 }

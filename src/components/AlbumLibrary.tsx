@@ -69,6 +69,16 @@ const WHEEL_VELOCITY_SCALE = 0.0037; // converts a wheel event's px delta into a
 // a full spare cycle of rendered content on either side of the visible window.
 const REPEAT_COUNT = 3;
 
+// Mobile-only: how many sleeves on either side of the currently-centered one
+// keep their full 3D geometry (see AlbumSleeve's `full` prop). Every sleeve in
+// the loop is mounted at once regardless of this window — it only decides
+// which ones also get their two image-textured cover layers, the actual GPU
+// memory cost. Sleeves this far from center are already heavily foreshortened
+// toward edge-on in the shared perspective, so losing their cover layers
+// isn't visible; this just caps how many full-resolution texture layers can
+// be resident at once on the budget-constrained mobile GPU.
+const ACTIVE_WINDOW_RADIUS = 6;
+
 // Floors the width used for size/spacing scaling at CHROME_BREAKPOINT, so
 // below that (mobile) the row stops shrinking and the viewport clips it
 // instead — see the comment above CHROME_BREAKPOINT's declaration.
@@ -102,6 +112,21 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
   const [sleeveTop, setSleeveTop] = useState(() =>
     sleeveTopForViewport(window.innerWidth, window.innerHeight, META_CONTENT_HEIGHT_ESTIMATE)
   );
+
+  const repeatedCount = REPEAT_COUNT * albums.length;
+  // Index (into repeatedAlbums) of the sleeve that gets full geometry ±
+  // ACTIVE_WINDOW_RADIUS — see ACTIVE_WINDOW_RADIUS. Only tracked/used on
+  // mobile; desktop always renders every sleeve at full geometry. Initialized
+  // to match where x.current itself initializes below (the middle copy's
+  // first album, centered on first paint).
+  const [activeRange, setActiveRange] = useState(() => {
+    const center = albums.length;
+    return {
+      start: Math.max(0, center - ACTIVE_WINDOW_RADIUS),
+      end: Math.min(repeatedCount - 1, center + ACTIVE_WINDOW_RADIUS),
+    };
+  });
+  const lastCenterIndex = useRef(albums.length);
 
   const spacing = useRef(SLEEVE_SIZE * SPACING_VW);
   const x = useRef(0);
@@ -202,6 +227,22 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       }
 
       wrap();
+
+      // Mobile-only: recompute which sleeves are near the centered position,
+      // and only touch React state when that integer index actually changes
+      // (roughly once per sleeve-width of scroll) — see ACTIVE_WINDOW_RADIUS.
+      const viewport = viewportRef.current;
+      if (viewport && window.innerWidth < CHROME_BREAKPOINT && spacing.current) {
+        const raw = (viewport.clientWidth / 2 - x.current) / spacing.current;
+        const center = Math.max(0, Math.min(repeatedCount - 1, Math.round(raw)));
+        if (center !== lastCenterIndex.current) {
+          lastCenterIndex.current = center;
+          setActiveRange({
+            start: Math.max(0, center - ACTIVE_WINDOW_RADIUS),
+            end: Math.min(repeatedCount - 1, center + ACTIVE_WINDOW_RADIUS),
+          });
+        }
+      }
 
       const track = trackRef.current;
       const metaTrack = metaTrackRef.current;
@@ -328,13 +369,14 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
           className="absolute inset-0 flex items-start will-change-transform"
           style={{ transformStyle: "preserve-3d" }}
         >
-          {repeatedAlbums.map(({ album, key }) => (
+          {repeatedAlbums.map(({ album, key }, index) => (
             <AlbumSleeve
               key={key}
               album={album}
               size={sleeveSize}
               onSelect={handleSelect}
               raised={key === hoveredKey}
+              full={window.innerWidth >= CHROME_BREAKPOINT || (index >= activeRange.start && index <= activeRange.end)}
             />
           ))}
         </div>
