@@ -33,6 +33,19 @@ interface PlayerContextValue extends PlayerState {
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
+function coverArtMimeType(src: string): string {
+  const ext = src.split(".").pop()?.toLowerCase().split(/[?#]/)[0];
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "webp":
+      return "image/webp";
+    default:
+      return "image/png";
+  }
+}
+
 function findTrack(albumId: string, trackId: string) {
   const album = albums.find((a) => a.id === albumId) ?? null;
   const track = album?.tracks.find((t) => t.id === trackId) ?? null;
@@ -234,6 +247,82 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       });
     }
   }, []);
+
+  // iOS/Android lock-screen and Control Center now-playing card: cover art,
+  // title, and artist come from the current track, and the native transport
+  // buttons there call back into the same play/pause/next/prev/seek used
+  // in-app. There's no OS surface for a full tracklist — lock screens only
+  // ever show the single now-playing track's metadata.
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    if (!album || !track) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist: album.artist,
+      album: album.title,
+      artwork: [{ src: album.coverArt, sizes: "512x512", type: coverArtMimeType(album.coverArt) }],
+    });
+  }, [album, track]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [isPlaying]);
+
+  const togglePlayRef = useRef(togglePlay);
+  useEffect(() => {
+    togglePlayRef.current = togglePlay;
+  }, [togglePlay]);
+  const prevRef = useRef(prev);
+  useEffect(() => {
+    prevRef.current = prev;
+  }, [prev]);
+  const seekRef = useRef(seek);
+  useEffect(() => {
+    seekRef.current = seek;
+  }, [seek]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    const session = navigator.mediaSession;
+    session.setActionHandler("play", () => togglePlayRef.current());
+    session.setActionHandler("pause", () => togglePlayRef.current());
+    session.setActionHandler("previoustrack", () => prevRef.current());
+    session.setActionHandler("nexttrack", () => nextRef.current());
+    session.setActionHandler("seekto", (details) => {
+      if (details.seekTime != null) seekRef.current(details.seekTime);
+    });
+    return () => {
+      session.setActionHandler("play", null);
+      session.setActionHandler("pause", null);
+      session.setActionHandler("previoustrack", null);
+      session.setActionHandler("nexttrack", null);
+      session.setActionHandler("seekto", null);
+    };
+  }, []);
+
+  // Keeps the lock screen's scrub bar in sync with actual playback. Polled on
+  // an interval rather than every rAF tick (like the in-app seek bar) since
+  // OS chrome only needs roughly-live position, not frame-perfect motion.
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !navigator.mediaSession.setPositionState) return;
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    const updatePosition = () => {
+      navigator.mediaSession.setPositionState({
+        duration,
+        position: Math.min(audio.currentTime, duration),
+        playbackRate: audio.playbackRate,
+      });
+    };
+    updatePosition();
+    if (!isAudioPlaying) return;
+    const intervalId = window.setInterval(updatePosition, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [duration, isAudioPlaying, track]);
 
   const setVolume = useCallback((next: number) => {
     if (!audioRef.current) return;

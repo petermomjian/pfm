@@ -7,15 +7,25 @@ import { TRACK_SWAP_TRANSITION } from "@/lib/motion";
 
 interface HeaderProps {
   onSelectAlbum: (albumId: string) => void;
+  isFocused: boolean;
+  onBack: () => void;
 }
 
-export function Header({ onSelectAlbum }: HeaderProps) {
+export function Header({ onSelectAlbum, isFocused, onBack }: HeaderProps) {
   const { album, track, isAudioPlaying } = usePlayer();
   const reduceMotion = useReducedMotion();
 
   return (
     <div className="flex w-full items-center justify-between pointer-events-auto md:h-[var(--pfm-chrome-row-h)]">
-      <Logo height={32} className="pfm-fluid h-6 w-auto md:h-8" role="img" aria-label={SITE_NAME} />
+      <button
+        type="button"
+        aria-label={isFocused ? "Back to library" : SITE_NAME}
+        onClick={() => isFocused && onBack()}
+        disabled={!isFocused}
+        className="pfm-interactive hover:scale-[1.02] hover:opacity-80 active:scale-[0.98] active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] disabled:pointer-events-none"
+      >
+        <Logo height={32} className="pfm-fluid h-6 w-auto md:h-8" aria-hidden="true" />
+      </button>
 
       <button
         type="button"

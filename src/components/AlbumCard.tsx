@@ -2,6 +2,7 @@ import type { CSSProperties, Ref } from "react";
 import { Pause, Play } from "lucide-react";
 import type { Album } from "@/data/albums";
 import { usePlayer } from "@/player/PlayerContext";
+import { useEdgeColor } from "@/hooks/useEdgeColor";
 import { IconSwap } from "./icons/IconSwap";
 
 // Visible thickness of the sleeve's front edge — the part of every sleeve
@@ -60,6 +61,10 @@ interface AlbumSleeveProps {
 // unlike the thin edge faces, the covers don't need a flattened wrapper to
 // force paint order.
 export function AlbumSleeve({ album, size, onSelect, raised = false }: AlbumSleeveProps) {
+  // Ties the spine's fill to the artwork's own outer-edge color so the sleeve
+  // reads as continuous with the cover instead of a fixed neutral fill.
+  const spineColor = useEdgeColor(album.coverArt, "var(--surface)");
+
   const faceStyle: CSSProperties = {
     width: size,
     height: size,
@@ -108,7 +113,12 @@ export function AlbumSleeve({ album, size, onSelect, raised = false }: AlbumSlee
           face's near boundary, SPINE_WIDTH away. */}
       <div
         className="absolute inset-y-0 left-0 border"
-        style={{ width: SPINE_WIDTH, backgroundColor: "var(--surface)", borderColor: "var(--surface-border)" }}
+        style={{
+          width: SPINE_WIDTH,
+          backgroundColor: spineColor,
+          borderColor: "var(--surface-border)",
+          transition: "background-color 400ms var(--ease-out-subtle)",
+        }}
       />
       {/* Far edge: the same near-edge geometry, pushed straight back by the
           sleeve's full receding depth — connects the front and back faces'
@@ -131,19 +141,24 @@ export function AlbumSleeve({ album, size, onSelect, raised = false }: AlbumSlee
           height so it bridges the bottom edges instead. */}
       <div className="absolute left-0 border" style={{ ...edgeWallStyle, top: size, transform: "rotateY(90deg) rotateX(90deg)" }} />
 
-      {/* Back cover: pivoted from the far edge instead of the spine (net
-          rotateY(270deg), translated back into the box's own span) so it
-          extends the opposite way from the front cover and presents its
-          own front — not the front cover's mirrored backface — whenever
-          the front cover is the one facing away from the camera. */}
+      {/* Back cover: rotateY(270deg) gives it the opposite outward normal
+          (-X) from the front cover's (+X), so it hinges from the spine's own
+          near edge (x=0, no X offset) rather than the front cover's — its
+          near edge lands on the box's -X wall, the side its normal actually
+          points toward, instead of sharing the front cover's hinge line. */}
       <div
         className="absolute left-0 top-0 border"
-        style={{ ...backFaceStyle, transform: `translate3d(${SPINE_WIDTH}px, 0px, -${size}px) rotateY(270deg)` }}
+        style={{ ...backFaceStyle, transform: `translateZ(-${size}px) rotateY(270deg)` }}
       />
 
       {/* Front cover: the album artwork, extending backward from the spine
-          into -Z. */}
-      <div className="absolute left-0 top-0 border" style={{ ...faceStyle, transform: "rotateY(90deg)" }} />
+          into -Z. Hinges from the far (+X) edge of the spine — the side its
+          rotateY(90deg) normal (+X) actually points toward — so each cover's
+          near edge sits on the wall its own normal faces, not its sibling's. */}
+      <div
+        className="absolute left-0 top-0 border"
+        style={{ ...faceStyle, transform: `translateX(${SPINE_WIDTH}px) rotateY(90deg)` }}
+      />
     </div>
   );
 }

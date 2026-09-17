@@ -61,7 +61,7 @@ function AppShell() {
               <BackToLibrary album={focusedAlbum} onBack={onBack} />
             </div>
           ) : (
-            <Header onSelectAlbum={onSelect} />
+            <Header onSelectAlbum={onSelect} isFocused={Boolean(focusedAlbum)} onBack={onBack} />
           )}
           {isMobile ? <MobileTransportBar onSelectAlbum={onSelect} /> : <GlobalPlayerBar />}
         </div>
