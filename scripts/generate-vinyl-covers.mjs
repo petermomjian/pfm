@@ -1,12 +1,18 @@
-// Generates a downscaled `cover-vinyl.jpg` next to every album's `cover.*`,
+// Generates a downscaled `cover-vinyl.png` next to every album's `cover.*`,
 // used for the vinyl label artwork instead of the full-resolution cover.
 // Source covers are typically ~1000px+ square, but the vinyl label only ever
 // renders at up to 320px on screen — letting the browser downscale that far
 // at paint time (especially while the platter is spinning) produces visible
 // moire/aliasing. Pre-resizing once at build time fixes that.
 //
+// PNG (lossless), not JPEG: the label renders this asset at close to native
+// resolution (no further scaling), so any compression artifact is directly
+// visible — and JPEG's DCT blocking reads as visible "crunchiness" (ringing)
+// around the hard edges of cover text/logos. At 320px square the lossless
+// file size cost is negligible.
+//
 // Runs automatically before `npm run dev` / `npm run build` (see package.json
-// "predev"/"prebuild"), and skips albums whose cover-vinyl.jpg is already
+// "predev"/"prebuild"), and skips albums whose cover-vinyl.png is already
 // newer than the source cover. Run directly with:
 //   node scripts/generate-vinyl-covers.mjs
 import { readdirSync, statSync } from "node:fs";
@@ -36,7 +42,7 @@ for (const folder of folders) {
   if (!coverFile) continue;
 
   const sourcePath = path.join(folderPath, coverFile);
-  const outputPath = path.join(folderPath, "cover-vinyl.jpg");
+  const outputPath = path.join(folderPath, "cover-vinyl.png");
 
   const sourceMtime = statSync(sourcePath).mtimeMs;
   const outputMtime = statSync(outputPath, { throwIfNoEntry: false })?.mtimeMs ?? 0;
@@ -47,7 +53,7 @@ for (const folder of folders) {
 
   await sharp(sourcePath)
     .resize(OUTPUT_SIZE, OUTPUT_SIZE, { fit: "cover" })
-    .jpeg({ quality: 90 })
+    .png({ compressionLevel: 9 })
     .toFile(outputPath);
   console.log(`generated ${path.relative(albumsDir, outputPath)}`);
   generated++;

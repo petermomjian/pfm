@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/generate-vinyl-covers.mjs",
+    "predev": "node scripts/generate-vinyl-covers.mjs && node scripts/generate-sleeve-covers.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/generate-vinyl-covers.mjs",
+    "prebuild": "node scripts/generate-vinyl-covers.mjs && node scripts/generate-sleeve-covers.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

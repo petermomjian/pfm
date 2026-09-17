@@ -331,7 +331,15 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       // edge/back cover near the vanishing point — not true z-fighting, but
       // the crossover re-deciding itself every frame on a value that never
       // needed sub-pixel precision to look smooth.
-      const transform = `translateX(${Math.round(x.current)}px)`;
+      // translate3d, not translateX: this track lives inside the shared
+      // preserve-3d scene, and an explicit 3D transform function is what
+      // actually keeps a per-frame update like this one on the compositor
+      // thread as a pure layer-matrix change — a 2D transform function here
+      // gives the browser room to treat it as a plain layout-adjacent style
+      // write instead, inviting a main-thread repaint of the 3D subtree on
+      // every frame instead of just re-positioning the already-rasterized
+      // sleeve layers.
+      const transform = `translate3d(${Math.round(x.current)}px, 0, 0)`;
       if (track) track.style.transform = transform;
       if (metaTrack) metaTrack.style.transform = transform;
 

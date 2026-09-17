@@ -1,6 +1,22 @@
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-display/InterDisplay-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-display/InterDisplay-Medium.woff2") format("woff2");
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -40,7 +56,7 @@ body {
   overflow: hidden;
   background-color: var(--background);
   color: var(--foreground);
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Inter Display", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 /* Shared easing for hover/active/focus interaction states across components. */

@@ -37,7 +37,7 @@ export function BackToLibrary({ album, onBack, className }: BackToLibraryProps) 
         type="button"
         aria-label="Back to library"
         onClick={onBack}
-        className="pfm-interactive flex size-9 -translate-x-3.5 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] max-md:translate-x-0.5"
+        className="pfm-interactive flex size-9 shrink-0 -translate-x-3.5 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] max-md:translate-x-0.5"
       >
         <ArrowLeft size={16} />
       </button>
@@ -46,13 +46,13 @@ export function BackToLibrary({ album, onBack, className }: BackToLibraryProps) 
           type="button"
           aria-label={isThisAlbumPlaying ? `Pause ${album.title}` : `Play ${album.title}`}
           onClick={handlePlay}
-          className="pfm-interactive flex size-9 translate-x-2 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
+          className="pfm-interactive flex size-9 shrink-0 translate-x-2 items-center justify-center rounded-full text-foreground hover:bg-[var(--surface)] hover:scale-110 active:bg-transparent active:scale-90 active:opacity-60 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)]"
         >
           <IconSwap id={isThisAlbumPlaying ? "pause" : "play"} size={16} scale={0.4} blur={10}>
             {isThisAlbumPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
           </IconSwap>
         </button>
-        <p className="text-base font-medium">{album.title}</p>
+        <p className="min-w-0 truncate text-base font-medium">{album.title}</p>
       </div>
     </div>
   );

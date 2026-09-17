@@ -99,11 +99,15 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
   // reads as continuous with the cover instead of a fixed neutral fill.
   const spineColor = useEdgeColor(album.coverArt, "var(--surface)");
 
+  // coverArtSleeve (not the raw coverArt) — pre-downscaled to this component's
+  // max display size (see scripts/generate-sleeve-covers.mjs) so the browser
+  // isn't minifying a full-resolution source every frame while this face
+  // rotates through the shared perspective, which reads as shimmer/moire.
   const faceStyle: CSSProperties = {
     width: size,
     height: size,
     backgroundColor: "var(--surface)",
-    backgroundImage: `${ARTWORK_OVERLAY}, url(${album.coverArt})`,
+    backgroundImage: `${ARTWORK_OVERLAY}, url(${album.coverArtSleeve})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundOrigin: "border-box",
@@ -111,6 +115,14 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
     borderImage: OUTLINE_FADE_FRONT,
     transformOrigin: "left top",
     backfaceVisibility: "hidden",
+    // Explicit, not just implied by backfaceVisibility: makes sure this
+    // face's rasterized bitmap is treated as stable/cacheable GPU-layer
+    // content while the shared track's translate3d keeps changing every
+    // frame — without it, the track's constant updates can make the
+    // browser re-derive this layer's content instead of just re-projecting
+    // the existing one, which is what actually read as shimmer on the
+    // image's own high-contrast detail (thin lines, type) during motion.
+    willChange: "transform",
   };
 
   // Same footprint as the front face, rotated a further 180° about Y so its
@@ -119,7 +131,7 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
   // other direction, not the front face re-shown with a flipped normal.
   const backFaceStyle: CSSProperties = {
     ...faceStyle,
-    backgroundImage: `${ARTWORK_OVERLAY_BACK}, url(${album.coverArt})`,
+    backgroundImage: `${ARTWORK_OVERLAY_BACK}, url(${album.coverArtSleeve})`,
     borderImage: OUTLINE_FADE_BACK,
   };
 
@@ -136,6 +148,11 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
     backgroundRepeat: "no-repeat",
     borderImage: OUTLINE_FADE_FRONT,
     transformOrigin: "left top",
+    // Same reasoning as the cover faces' backfaceVisibility above: this wall
+    // is rotated (rotateY/rotateX below), so without it the CSS default
+    // renders its mirrored backface — the fade direction reversed — for
+    // roughly half of every pass through the shared perspective.
+    backfaceVisibility: "hidden",
   };
 
   return (

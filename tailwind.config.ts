@@ -16,7 +16,7 @@ export default {
         "surface-strong": "var(--surface-strong)",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Inter Display", "Inter", "system-ui", "sans-serif"],
       },
     },
   },
