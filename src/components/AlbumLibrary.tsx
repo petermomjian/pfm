@@ -126,7 +126,11 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       end: Math.min(repeatedCount - 1, center + ACTIVE_WINDOW_RADIUS),
     };
   });
-  const lastCenterIndex = useRef(albums.length);
+  // -1 (not a valid repeatedAlbums index) so the first tick's change check
+  // always fires — otherwise, whenever the real starting center happens to
+  // equal this ref's initial value, the first-paint z-index assignment
+  // below (see tick()) would simply never run.
+  const lastCenterIndex = useRef(-1);
 
   const spacing = useRef(SLEEVE_SIZE * SPACING_VW);
   const x = useRef(0);
@@ -168,6 +172,10 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       track.style.gap = `${gapPx}px`;
       metaTrack.style.gap = `${gapPx}px`;
       metaTrack.style.setProperty("--slot-width", `${spacingPx}px`);
+      // Also exposed on the sleeve track (inherited by each AlbumSleeve) so a
+      // sleeve can clip its own rendered content to its lane — see the
+      // clipPath comment in AlbumCard.tsx.
+      track.style.setProperty("--slot-width", `${spacingPx}px`);
 
       const centerX = viewport.clientWidth / 2;
       const cycle = albums.length * spacingPx;
@@ -228,25 +236,80 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
 
       wrap();
 
-      // Mobile-only: recompute which sleeves are near the centered position,
-      // and only touch React state when that integer index actually changes
-      // (roughly once per sleeve-width of scroll) — see ACTIVE_WINDOW_RADIUS.
+      // Recompute which sleeve is nearest the centered position every frame
+      // (see the z-index comment below for why this can't be throttled to
+      // only when the integer index changes), and separately gate the
+      // mobile-only React state update to when that integer actually
+      // changes (roughly once per sleeve-width of scroll).
       const viewport = viewportRef.current;
-      if (viewport && window.innerWidth < CHROME_BREAKPOINT && spacing.current) {
+      if (viewport && spacing.current) {
         const raw = (viewport.clientWidth / 2 - x.current) / spacing.current;
         const center = Math.max(0, Math.min(repeatedCount - 1, Math.round(raw)));
+
         if (center !== lastCenterIndex.current) {
           lastCenterIndex.current = center;
-          setActiveRange({
-            start: Math.max(0, center - ACTIVE_WINDOW_RADIUS),
-            end: Math.min(repeatedCount - 1, center + ACTIVE_WINDOW_RADIUS),
+
+          // Mobile-only: also widen/shift the window of sleeves mounted at
+          // full geometry — see ACTIVE_WINDOW_RADIUS.
+          if (window.innerWidth < CHROME_BREAKPOINT) {
+            setActiveRange({
+              start: Math.max(0, center - ACTIVE_WINDOW_RADIUS),
+              end: Math.min(repeatedCount - 1, center + ACTIVE_WINDOW_RADIUS),
+            });
+          }
+        }
+
+        // Each sleeve is its own preserve-3d group, so nothing here gives
+        // Chromium a true, unified 3D sort between different sleeves' own
+        // geometry — only within one sleeve's own faces (spine, covers,
+        // etc.), which back-face visibility already handles. Between
+        // sleeves it falls back to DOM/paint order, which only happens to
+        // match correct occlusion (nearer beats farther) for sleeves left
+        // of the shared vanishing point, where a receding cover reaches
+        // toward *later* DOM siblings. Right of it, a receding cover
+        // reaches toward *earlier* siblings instead, so paint order runs
+        // backward from occlusion there — a farther sleeve's cover can
+        // paint over a nearer neighbor's own spine/cover, reading as
+        // artwork bleeding past that neighbor's edge. Explicit z-index,
+        // ranked purely by distance from the centered sleeve (independent
+        // of scroll direction, unlike DOM order), makes whichever sleeve is
+        // more central — and so genuinely nearer the camera at any point
+        // where two sleeves' geometry overlaps — win on both sides.
+        //
+        // Written every frame, not just when `center` changes: overlap
+        // extent between two given sleeves keeps shifting as x.current
+        // moves even while the nearest integer index stays put, so an
+        // update throttled to integer-index changes leaves z-index stale
+        // — matching the *previous* center — for most of the scroll
+        // between one change and the next. That stale ranking still picks
+        // the right winner in the vast majority of frames (rankings only
+        // flip right at an index boundary), but for the frames where it's
+        // wrong, a farther sleeve can briefly out-rank a nearer one and
+        // paint over it — visible as a hairline flash of the wrong
+        // sleeve's edge at the exact moment two sleeves' geometry crosses.
+        // Setting a style property is cheap enough to just do unconditionally.
+        const sleeveTrack = trackRef.current;
+        if (sleeveTrack) {
+          Array.from(sleeveTrack.children).forEach((child, i) => {
+            (child as HTMLElement).style.zIndex = String(repeatedCount - Math.abs(i - center));
           });
         }
       }
 
       const track = trackRef.current;
       const metaTrack = metaTrackRef.current;
-      const transform = `translateX(${x.current}px)`;
+      // Rounded to a whole pixel before it ever reaches the DOM. Every
+      // sleeve's rotation is an illusion of this shared perspective's fixed
+      // vanishing point acting on that sleeve's position — never its own
+      // (constant) transform — so the sub-pixel remainder x.current
+      // accumulates every frame was reaching the 3D scene too, nudging each
+      // sleeve's front/back cover pair (see AlbumSleeve) fractionally back
+      // and forth across the crossover where Chromium decides which of the
+      // pair is front-facing. That's what read as flicker along the far
+      // edge/back cover near the vanishing point — not true z-fighting, but
+      // the crossover re-deciding itself every frame on a value that never
+      // needed sub-pixel precision to look smooth.
+      const transform = `translateX(${Math.round(x.current)}px)`;
       if (track) track.style.transform = transform;
       if (metaTrack) metaTrack.style.transform = transform;
 

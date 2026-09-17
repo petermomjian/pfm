@@ -32,6 +32,30 @@ const ARTWORK_OVERLAY =
 const ARTWORK_OVERLAY_BACK =
   "linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,0) 100%)";
 
+// Every sleeve face is outlined with a 1px stroke. Read literally, that
+// stroke is a real edge of the box, so it should recede exactly like the
+// artwork above does: strongest at the near edge (the spine, z=0), fading to
+// nothing by the far edge (z=-size) — a depth fade, not a top/bottom one.
+// border-image (rather than a mask or an overlay) fades only the stroke
+// itself, leaving the artwork/vinyl untouched, and it shares the exact same
+// local near→far axis as ARTWORK_OVERLAY/_BACK above — so front cover and
+// the top/bottom walls (whose local x sweeps the same depth span as the
+// front cover, see edgeWallStyle) use the front-facing direction, and the
+// back cover mirrors it exactly like ARTWORK_OVERLAY_BACK does.
+const OUTLINE_FADE_FRONT =
+  "linear-gradient(to right, var(--surface-border) 0%, var(--surface-border) 25%, transparent 75%, transparent 100%) 1";
+const OUTLINE_FADE_BACK =
+  "linear-gradient(to left, var(--surface-border) 0%, var(--surface-border) 25%, transparent 75%, transparent 100%) 1";
+
+// The top/bottom walls are flat EDGE_COLOR fills, not artwork, but they span
+// the exact same near→far depth as the front cover (see edgeWallStyle) — so
+// left as a solid fill, the far end reads as a hard-edged grey rectangle
+// floating in the black background instead of receding into it like every
+// other face already does. Fading the fill itself, on the same axis and
+// stops as OUTLINE_FADE_FRONT, keeps it consistent with the artwork/outline
+// depth cues instead of standing out as the one un-faded material.
+const EDGE_FILL_FADE = `linear-gradient(to right, ${EDGE_COLOR} 0%, ${EDGE_COLOR} 25%, transparent 75%, transparent 100%)`;
+
 interface AlbumSleeveProps {
   album: Album;
   size: number; // px — square face depth/height, shared with the perspective scene's height
@@ -82,7 +106,7 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
     backgroundImage: `${ARTWORK_OVERLAY}, url(${album.coverArt})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
-    borderColor: "var(--surface-border)",
+    borderImage: OUTLINE_FADE_FRONT,
     transformOrigin: "left top",
     backfaceVisibility: "hidden",
   };
@@ -94,6 +118,7 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
   const backFaceStyle: CSSProperties = {
     ...faceStyle,
     backgroundImage: `${ARTWORK_OVERLAY_BACK}, url(${album.coverArt})`,
+    borderImage: OUTLINE_FADE_BACK,
   };
 
   // Top/bottom walls: real quads spanning the full receding depth (size) by
@@ -103,8 +128,9 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
   const edgeWallStyle: CSSProperties = {
     width: size,
     height: SPINE_WIDTH,
-    backgroundColor: EDGE_COLOR,
-    borderColor: "var(--surface-border)",
+    backgroundColor: "transparent",
+    backgroundImage: EDGE_FILL_FADE,
+    borderImage: OUTLINE_FADE_FRONT,
     transformOrigin: "left top",
   };
 
@@ -120,7 +146,9 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
     >
       {/* Spine: the sleeve's near edge, facing the camera head-on (never
           rotated) — connects the front face's near boundary to the back
-          face's near boundary, SPINE_WIDTH away. */}
+          face's near boundary, SPINE_WIDTH away. Sits at a single, constant
+          depth (z=0, the nearest point on the whole box), so unlike the
+          faces its stroke never fades — it's the outline's full-strength end. */}
       <div
         className="absolute inset-y-0 left-0 border"
         style={{
@@ -132,13 +160,23 @@ export function AlbumSleeve({ album, size, onSelect, raised = false, full = true
       />
       {/* Far edge: the same near-edge geometry, pushed straight back by the
           sleeve's full receding depth — connects the front and back faces'
-          deepest boundary. */}
+          deepest boundary. Sits at a single, constant depth (z=-size, the
+          farthest point on the whole box) — the far end of every other
+          face's depth fade, where they've already faded to nothing — so
+          both its stroke and its fill match that: fully faded out, not
+          drawn at all. A flat EDGE_COLOR fill here (this face has no depth
+          range of its own to fade across) read as a hard-edged grey
+          rectangle floating in the black background whenever it isn't
+          fully covered by the nearer front/back cover, instead of
+          receding into it like the rest of the box already does.
+          Perspective still foreshortens it down to a thin sliver at
+          extreme rotation — this only fixes its color, not its geometry. */}
       <div
         className="absolute inset-y-0 left-0 border"
         style={{
           width: SPINE_WIDTH,
-          backgroundColor: EDGE_COLOR,
-          borderColor: "var(--surface-border)",
+          backgroundColor: "transparent",
+          borderColor: "transparent",
           transform: `translateZ(-${size}px)`,
         }}
       />
