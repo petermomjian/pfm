@@ -134,7 +134,7 @@ function AppShell() {
 
   const focusedAlbum = view.screen === "focused" ? albums.find((a) => a.id === view.albumId) : undefined;
 
-  const { track, currentTime, volume, togglePlay, next, prev, seek, setVolume, toggleMute } = usePlayer();
+  const { track, currentTimeRef, volume, togglePlay, next, prev, seek, setVolume, toggleMute } = usePlayer();
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -152,13 +152,13 @@ function AppShell() {
         case "ArrowRight":
           if (track) {
             e.preventDefault();
-            seek(currentTime + SEEK_STEP_SECONDS);
+            seek(currentTimeRef.current + SEEK_STEP_SECONDS);
           }
           break;
         case "ArrowLeft":
           if (track) {
             e.preventDefault();
-            seek(currentTime - SEEK_STEP_SECONDS);
+            seek(currentTimeRef.current - SEEK_STEP_SECONDS);
           }
           break;
         case "ArrowUp":
@@ -188,7 +188,7 @@ function AppShell() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [view.screen, track, currentTime, volume, togglePlay, next, prev, seek, setVolume, toggleMute]);
+  }, [view.screen, track, volume, togglePlay, next, prev, seek, setVolume, toggleMute]);
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-background text-foreground">

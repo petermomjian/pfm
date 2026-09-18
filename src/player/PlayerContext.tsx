@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MutableRefObject,
   type ReactNode,
 } from "react";
 import { albums, type Album, type Track } from "@/data/albums";
@@ -15,13 +16,17 @@ interface PlayerState {
   track: Track | null;
   isPlaying: boolean;
   isAudioPlaying: boolean;
-  currentTime: number;
   duration: number;
   volume: number;
   isMuted: boolean;
 }
 
 interface PlayerContextValue extends PlayerState {
+  // Live currentTime without subscribing to its every-frame updates — see
+  // PlaybackTimeContext below for why currentTime itself isn't a plain field
+  // here. Read `.current` inside an event handler/effect body, never at
+  // render time (it won't trigger a re-render when it changes).
+  currentTimeRef: MutableRefObject<number>;
   playTrack: (albumId: string, trackId: string) => void;
   togglePlay: () => void;
   next: () => void;
@@ -34,6 +39,16 @@ interface PlayerContextValue extends PlayerState {
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
+
+// Split out from PlayerContext because currentTime updates on every
+// animation frame during playback (see the rAF loop below), while
+// everything else changes rarely (play/pause, track change, volume). A
+// single shared context would force every usePlayer() consumer — including
+// ones that never touch currentTime, like each of the ~36 mounted album
+// rows in the library carousel — to re-render 60x/second. Keeping it in its
+// own context means only components that actually call usePlaybackTime()
+// (just SeekBar) pay that cost.
+const PlaybackTimeContext = createContext(0);
 
 function coverArtMimeType(src: string): string {
   const ext = src.split(".").pop()?.toLowerCase().split(/[?#]/)[0];
@@ -61,6 +76,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const currentTimeRef = useRef(0);
+  const setCurrentTimeTracked = useCallback((time: number) => {
+    currentTimeRef.current = time;
+    setCurrentTime(time);
+  }, []);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
   const [muted, setMuted] = useState(false);
@@ -89,7 +109,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.volume = volume;
     audioRef.current = audio;
 
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onTimeUpdate = () => setCurrentTimeTracked(audio.currentTime);
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
     const onEnded = () => {
       if (hasNextTrackRef.current) {
@@ -160,7 +180,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     let rafId: number;
     const tick = () => {
       const audio = audioRef.current;
-      if (audio) setCurrentTime(audio.currentTime);
+      if (audio) setCurrentTimeTracked(audio.currentTime);
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
@@ -247,7 +267,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const seek = useCallback((time: number) => {
     const dur = durationRef.current;
     const clamped = dur > 0 ? Math.min(time, Math.max(0, dur - 0.15)) : time;
-    setCurrentTime(clamped);
+    setCurrentTimeTracked(clamped);
     pendingSeekRef.current = clamped;
     if (seekRafRef.current == null) {
       seekRafRef.current = requestAnimationFrame(() => {
@@ -385,7 +405,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       track,
       isPlaying,
       isAudioPlaying,
-      currentTime,
+      currentTimeRef,
       duration,
       volume,
       isMuted,
@@ -404,7 +424,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       track,
       isPlaying,
       isAudioPlaying,
-      currentTime,
       duration,
       volume,
       isMuted,
@@ -420,11 +439,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  return (
+    <PlayerContext.Provider value={value}>
+      <PlaybackTimeContext.Provider value={currentTime}>{children}</PlaybackTimeContext.Provider>
+    </PlayerContext.Provider>
+  );
 }
 
 export function usePlayer() {
   const ctx = useContext(PlayerContext);
   if (!ctx) throw new Error("usePlayer must be used within a PlayerProvider");
   return ctx;
+}
+
+// Live currentTime, updating every animation frame during playback — see
+// PlaybackTimeContext's doc comment above. Call this only from the one or
+// two components that actually render a moving position (SeekBar); anything
+// else should use usePlayer()'s currentTimeRef instead so it doesn't
+// re-render on every frame.
+export function usePlaybackTime() {
+  return useContext(PlaybackTimeContext);
 }

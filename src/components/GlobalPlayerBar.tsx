@@ -9,7 +9,6 @@ export function GlobalPlayerBar() {
   const {
     track,
     isPlaying,
-    currentTime,
     duration,
     volume,
     isMuted,
@@ -91,7 +90,6 @@ export function GlobalPlayerBar() {
 
       <div className="flex flex-1 min-w-0 items-center justify-end">
         <SeekBar
-          currentTime={currentTime}
           duration={duration}
           onSeek={seek}
           onSeekStart={beginSeek}

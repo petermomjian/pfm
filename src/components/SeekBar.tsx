@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { usePlaybackTime } from "@/player/PlayerContext";
 
 interface SeekBarProps {
-  currentTime: number;
   duration: number;
   onSeek: (time: number) => void;
   /** Called when a scrub starts/stops, so playback can pause for the drag — see PlayerContext's beginSeek/endSeek. */
@@ -30,7 +30,6 @@ const PRESS_LIFT = 16;
 const FALLBACK_HALF_LABEL_WIDTH = 17;
 
 export function SeekBar({
-  currentTime,
   duration,
   onSeek,
   onSeekStart,
@@ -38,6 +37,10 @@ export function SeekBar({
   disabled = false,
   alwaysExpanded = false,
 }: SeekBarProps) {
+  // Isolates the every-animation-frame re-render to just this component —
+  // see PlaybackTimeContext's doc comment in PlayerContext.tsx.
+  const currentTime = usePlaybackTime();
+
   // Tracked explicitly instead of relying on the :active/peer-active pseudo-class:
   // :active drops as soon as the pointer strays outside the element's bounds
   // mid-drag, and doesn't reliably engage at all for touch (the target device

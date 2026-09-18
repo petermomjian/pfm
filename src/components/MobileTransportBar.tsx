@@ -21,7 +21,6 @@ export function MobileTransportBar({ onSelectAlbum }: MobileTransportBarProps) {
     track,
     isPlaying,
     isAudioPlaying,
-    currentTime,
     duration,
     isMuted,
     togglePlay,
@@ -51,7 +50,6 @@ export function MobileTransportBar({ onSelectAlbum }: MobileTransportBarProps) {
         </button>
 
         <SeekBar
-          currentTime={currentTime}
           duration={duration}
           onSeek={seek}
           onSeekStart={beginSeek}

@@ -283,6 +283,14 @@ export function AlbumLibrary({
     let frame: number | null = null;
     let lastTime = performance.now();
 
+    // Last zIndex actually written to each sleeve, so the per-frame pass
+    // below (see its own comment) can skip re-writing a style property that
+    // hasn't changed instead of touching all `repeatedCount` elements' style
+    // every frame regardless — most frames only shift rank right at the one
+    // or two sleeves nearest an index boundary. -1 never matches a real
+    // z-index, so every element's first frame still writes once.
+    const lastZIndex = new Int32Array(repeatedCount).fill(-1);
+
     // Keeps x.current within half a cycle of baseX. Since every copy of the
     // album list is identical, shifting by exactly one cycle is imperceptible
     // — this is what makes the row loop seamlessly in both directions.
@@ -361,12 +369,21 @@ export function AlbumLibrary({
         // wrong, a farther sleeve can briefly out-rank a nearer one and
         // paint over it — visible as a hairline flash of the wrong
         // sleeve's edge at the exact moment two sleeves' geometry crosses.
-        // Setting a style property is cheap enough to just do unconditionally.
+        // Iterates the live children collection directly (no Array.from
+        // copy) and skips the zIndex write when the rank hasn't changed
+        // since last frame — most sleeves' rank relative to a fixed center
+        // only actually flips right at an index boundary, so most frames
+        // only touch the one or two elements crossing one.
         const sleeveTrack = trackRef.current;
         if (sleeveTrack) {
-          Array.from(sleeveTrack.children).forEach((child, i) => {
-            const el = child as HTMLElement;
-            el.style.zIndex = String(repeatedCount - Math.abs(i - center));
+          const children = sleeveTrack.children;
+          for (let i = 0; i < children.length; i++) {
+            const el = children[i] as HTMLElement;
+            const z = repeatedCount - Math.abs(i - center);
+            if (lastZIndex[i] !== z) {
+              lastZIndex[i] = z;
+              el.style.zIndex = String(z);
+            }
 
             // The front/back cover pair (see AlbumSleeve) are two parallel
             // planes SPINE_WIDTH apart with opposite outward normals, each
@@ -392,7 +409,7 @@ export function AlbumLibrary({
               if (back.style.backfaceVisibility !== bv) back.style.backfaceVisibility = bv;
               if (front.style.backfaceVisibility !== bv) front.style.backfaceVisibility = bv;
             }
-          });
+          }
         }
       }
 
