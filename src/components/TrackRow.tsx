@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Track } from "@/data/albums";
 
 interface TrackRowProps {
@@ -12,10 +12,22 @@ export function TrackRow({ track, isActive, onPlay }: TrackRowProps) {
   // tracklist scrolls by touch directly over these rows, and mobile browsers
   // keep `:active` engaged on whatever row a touch started on for the whole
   // gesture, even once it turns into scrolling past that row — it reads as
-  // the row staying "pressed" while the user is just scrolling. `pointercancel`
-  // fires the moment a touch hands off to native scrolling, so it clears
-  // reliably where `:active` doesn't.
+  // the row staying "pressed" while the user is just scrolling.
   const [isPressed, setIsPressed] = useState(false);
+
+  // Belt-and-suspenders over the pointer handlers below: WebKit doesn't
+  // reliably fire `pointercancel` when a touch that started on a descendant
+  // button hands off to an ancestor's native scroll, so a press can still get
+  // stuck through the whole scroll on iOS. A `scroll` event on the tracklist's
+  // container is unambiguous proof the gesture became a scroll, so it's a
+  // reliable fallback — listened for in the capture phase since `scroll`
+  // doesn't bubble, and only while actually pressed to keep this cheap.
+  useEffect(() => {
+    if (!isPressed) return;
+    const clear = () => setIsPressed(false);
+    window.addEventListener("scroll", clear, { capture: true, passive: true });
+    return () => window.removeEventListener("scroll", clear, true);
+  }, [isPressed]);
 
   return (
     <button

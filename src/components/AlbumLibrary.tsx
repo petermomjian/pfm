@@ -1,10 +1,35 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { albums } from "@/data/albums";
+import { PAGE_EXIT_MS, PAGE_ENTER_DELAY_MS, PAGE_ENTER_MS, LIBRARY_SINK_DISTANCE, LIBRARY_SINK_DEPTH } from "@/lib/motion";
 import { AlbumSleeve, AlbumMeta, SPINE_WIDTH } from "./AlbumCard";
 
 interface AlbumLibraryProps {
   onSelect: (albumId: string) => void;
   onPlay: (albumId: string) => void;
+  // True for the detail view's entire open duration (not just mid-transition)
+  // — see App.tsx's `view` state. The whole library page (metadata row +
+  // sleeve carousel, as one unit) slides down and fades out while this is
+  // true, revealing the detail view sliding up over it. AlbumLibrary is
+  // always mounted now (never unmounted while the detail view is open) so
+  // this can just be an ordinary prop-driven style instead of needing a
+  // remount-triggered one, which is also what keeps the carousel's scroll
+  // position and loaded cover art intact across a round trip into the
+  // detail view and back.
+  sunk?: boolean;
+  // Which way the transition is actively running right now — only
+  // meaningful while it's actually in flight; ignored the rest of the time
+  // since nothing is changing to animate. "in" (accelerate away) while a
+  // click is carrying the library away, "out" (decelerate into place)
+  // while Back is carrying it back into view.
+  navEase?: "in" | "out";
+  // True only for the brief window Back is actively carrying the library
+  // back on top of the still-exiting detail view (see App.tsx's
+  // navTransition direction) — momentarily elevates it above the detail
+  // view so it visibly slides up *over* it, matching "putting the vinyl
+  // back into the sleeve." False the rest of the time, leaving the detail
+  // view on top — needed since AlbumLibrary is always mounted, even while
+  // fully hidden behind the detail view for its whole open duration.
+  onTop?: boolean;
 }
 
 const SPACING_VW = 0.15; // spine-to-spine pitch, as a fraction of viewport width
@@ -61,6 +86,13 @@ const MOMENTUM_DECAY = 0.94; // per animation-frame velocity decay once released
 const CLICK_DRAG_THRESHOLD = 6; // px of pointer movement before a click becomes a drag
 const WHEEL_LINE_HEIGHT = 16; // px per "line" when a wheel event reports deltaMode 1
 const WHEEL_VELOCITY_SCALE = 0.0037; // converts a wheel event's px delta into a velocity kick
+// Width, in fractions of one spine-to-spine slot, of the guard band around a
+// sleeve's own vanishing-point crossing where both cover faces are forced
+// paintable — see the backface-visibility comment in the tick loop below.
+// SPINE_WIDTH is tiny next to the scene's PERSPECTIVE/SLEEVE_SIZE, so the
+// actual dead zone this papers over is a sliver of a slot; this is sized
+// with generous headroom around it rather than tuned to its exact width.
+const CROSSOVER_GUARD_BAND = 0.05;
 
 // The row loops infinitely: the album list is rendered REPEAT_COUNT times back
 // to back, and the scroll position silently wraps by one full cycle (the width
@@ -101,7 +133,13 @@ function sleeveSizeForViewport(viewportWidth: number): number {
   return SLEEVE_SIZE * (width / DESKTOP_BREAKPOINT);
 }
 
-export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
+export function AlbumLibrary({
+  onSelect,
+  onPlay,
+  sunk = false,
+  navEase = "out",
+  onTop = false,
+}: AlbumLibraryProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const metaTrackRef = useRef<HTMLDivElement | null>(null);
@@ -327,7 +365,33 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
         const sleeveTrack = trackRef.current;
         if (sleeveTrack) {
           Array.from(sleeveTrack.children).forEach((child, i) => {
-            (child as HTMLElement).style.zIndex = String(repeatedCount - Math.abs(i - center));
+            const el = child as HTMLElement;
+            el.style.zIndex = String(repeatedCount - Math.abs(i - center));
+
+            // The front/back cover pair (see AlbumSleeve) are two parallel
+            // planes SPINE_WIDTH apart with opposite outward normals, each
+            // independently backface-culled by the browser based on this
+            // sleeve's position relative to the shared vanishing point.
+            // Because they're offset from each other rather than coincident,
+            // their two culling thresholds don't land on the exact same
+            // scroll position — there's a hairline gap between "front has
+            // rotated past face-on" and "back has rotated into face-on"
+            // where the browser culls both at once and the cover briefly
+            // shows nothing but the surface behind it. Only the sleeve
+            // currently crossing the vanishing point (raw within one slot of
+            // its own index) can ever be in that gap, so for just that one,
+            // force both faces paintable and let Chromium's real 3D sort
+            // (accurate within one sleeve's own preserve-3d group, unlike
+            // the cross-sleeve case above) pick whichever is actually
+            // nearer instead of trusting each face's own culling in
+            // isolation.
+            if (el.children.length > 4) {
+              const back = el.children[el.children.length - 2] as HTMLElement;
+              const front = el.children[el.children.length - 1] as HTMLElement;
+              const bv = Math.abs(raw - i) < CROSSOVER_GUARD_BAND ? "visible" : "hidden";
+              if (back.style.backfaceVisibility !== bv) back.style.backfaceVisibility = bv;
+              if (front.style.backfaceVisibility !== bv) front.style.backfaceVisibility = bv;
+            }
           });
         }
       }
@@ -447,6 +511,61 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
     wakeLoop.current();
   };
 
+  // The whole library page's own slide/fade against the detail view — see
+  // this component's `sunk`/`navEase`/`onTop` prop docs above. Exiting
+  // starts immediately (this is the transition's own starting point);
+  // entering waits out a delay so the two don't run fully concurrently —
+  // see PAGE_ENTER_DELAY_MS's doc in lib/motion.ts for why.
+  //
+  // Split across two different transforms rather than one shared wrapper:
+  // a second, independent `perspective` stacked on top of the sleeve
+  // scene's own (see the scene div below) warps its geometry — every sleeve
+  // read as visibly bowed even at rest, since the two perspectives'
+  // differing origins compound instead of composing cleanly. So the sink
+  // only ever happens *inside* the scene's own existing perspective (the
+  // sinkStyle wrapper nested inside it, just below) — the same "translateY
+  // within the shared preserve-3d scene" philosophy the sleeve hover-lift
+  // already uses, just applied to the whole row via one extra wrapper
+  // instead of to each sleeve individually. The flat metadata row (never
+  // rotated or scaled even at rest — see its own comment below) only needs
+  // a plain 2D translateY to match, no perspective involved.
+  //
+  // Opacity/z-index/pointer-events live once on the outer root instead of
+  // duplicated on both inner transforms, since both move as one unit.
+  const navTransition =
+    navEase === "in"
+      ? `${PAGE_EXIT_MS}ms var(--ease-page-transition)`
+      : `${PAGE_ENTER_MS}ms var(--ease-page-transition) ${PAGE_ENTER_DELAY_MS}ms`;
+  const rootStyle: CSSProperties = {
+    opacity: sunk ? 0 : 1,
+    transition: `opacity ${navTransition}`,
+    zIndex: onTop ? 2 : 0,
+    pointerEvents: sunk && !onTop ? "none" : "auto",
+  };
+  const flatSinkStyle: CSSProperties = {
+    transform: sunk ? `translateY(${LIBRARY_SINK_DISTANCE}px)` : "translateY(0px)",
+    transition: `transform ${navTransition}`,
+  };
+  // Genuine translateZ, not just translateY — this is what makes the sink a
+  // real move through the scene's existing perspective (the same shared 3D
+  // space the sleeve hover-lift's own translateY already lives in) instead
+  // of a flat 2D slide. Receding in Z under a perspective projection
+  // naturally shrinks an object's apparent size (moving away from the
+  // camera), which read as an unwanted scale-down here — so it's paired
+  // with a compensating scale, computed from this same scene's own
+  // effective perspective value, that exactly cancels the projection's
+  // shrink factor. Net effect: the row genuinely moves back in Z (real 3D
+  // movement) while staying visually the same size throughout.
+  const effectivePerspective = PERSPECTIVE * (sleeveSize / SLEEVE_SIZE);
+  const sinkCompensateScale = (effectivePerspective + LIBRARY_SINK_DEPTH) / effectivePerspective;
+  const scene3dSinkStyle: CSSProperties = {
+    transformStyle: "preserve-3d",
+    transform: sunk
+      ? `translateY(${LIBRARY_SINK_DISTANCE}px) translateZ(-${LIBRARY_SINK_DEPTH}px) scale(${sinkCompensateScale})`
+      : "translateY(0px) translateZ(0px) scale(1)",
+    transition: `transform ${navTransition}`,
+  };
+
   return (
     <div
       ref={viewportRef}
@@ -454,6 +573,7 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       aria-label="Album library, scroll to browse"
       tabIndex={0}
       className="absolute inset-0 cursor-grab overflow-hidden touch-pan-y outline-none select-none active:cursor-grabbing"
+      style={rootStyle}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
@@ -463,24 +583,30 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
       onDragStart={(e) => e.preventDefault()}
     >
       {/* Flat metadata overlay — translates with the row but never rotates or scales. */}
-      <div
-        ref={metaTrackRef}
-        className="absolute left-0 flex w-full will-change-transform"
-        style={{ bottom: `calc(100% - ${sleeveTop - GAP_ABOVE_SLEEVE}px)` }}
-      >
-        {repeatedAlbums.map(({ album, key }, index) => (
-          <AlbumMeta
-            key={key}
-            album={album}
-            onSelect={handleSelect}
-            onPlay={handlePlay}
-            contentRef={index === 0 ? metaContentRef : undefined}
-            onHoverChange={(hovering) => setHoveredKey(hovering ? key : null)}
-          />
-        ))}
+      <div className="absolute inset-0" style={flatSinkStyle}>
+        <div
+          ref={metaTrackRef}
+          className="absolute left-0 flex w-full will-change-transform"
+          style={{ bottom: `calc(100% - ${sleeveTop - GAP_ABOVE_SLEEVE}px)` }}
+        >
+          {repeatedAlbums.map(({ album, key }, index) => (
+            <AlbumMeta
+              key={key}
+              album={album}
+              onSelect={handleSelect}
+              onPlay={handlePlay}
+              contentRef={index === 0 ? metaContentRef : undefined}
+              onHoverChange={(hovering) => setHoveredKey(hovering ? key : null)}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Stationary perspective scene — only the track inside it translates along X. */}
+      {/* Stationary perspective scene — unchanged from before this
+          transition existed. Only the track inside it translates along X;
+          the new sink wrapper nested just inside it (scene3dSinkStyle)
+          shares this exact perspective rather than introducing a second,
+          conflicting one. */}
       <div
         className="absolute left-0 w-full"
         style={{
@@ -494,21 +620,23 @@ export function AlbumLibrary({ onSelect, onPlay }: AlbumLibraryProps) {
           transformStyle: "preserve-3d",
         }}
       >
-        <div
-          ref={trackRef}
-          className="absolute inset-0 flex items-start will-change-transform"
-          style={{ transformStyle: "preserve-3d" }}
-        >
-          {repeatedAlbums.map(({ album, key }, index) => (
-            <AlbumSleeve
-              key={key}
-              album={album}
-              size={sleeveSize}
-              onSelect={handleSelect}
-              raised={key === hoveredKey}
-              full={index >= activeRange.start && index <= activeRange.end}
-            />
-          ))}
+        <div className="absolute inset-0" style={scene3dSinkStyle}>
+          <div
+            ref={trackRef}
+            className="absolute inset-0 flex items-start will-change-transform"
+            style={{ transformStyle: "preserve-3d" }}
+          >
+            {repeatedAlbums.map(({ album, key }, index) => (
+              <AlbumSleeve
+                key={key}
+                album={album}
+                size={sleeveSize}
+                onSelect={handleSelect}
+                raised={key === hoveredKey}
+                full={index >= activeRange.start && index <= activeRange.end}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>

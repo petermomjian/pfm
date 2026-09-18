@@ -45,7 +45,7 @@ export function Header({ onSelectAlbum, isFocused, onBack }: HeaderProps) {
                 exit={{ opacity: 0, y: -4 }}
                 transition={reduceMotion ? { duration: 0.1 } : TRACK_SWAP_TRANSITION}
               >
-                <span className="text-muted group-hover:text-foreground">Now Playing</span>
+                <span className="pfm-interactive text-muted group-hover:text-foreground">Now Playing</span>
                 <span className="relative h-5 w-full">
                   <AnimatePresence initial={false} mode="popLayout">
                     <motion.span
@@ -64,7 +64,7 @@ export function Header({ onSelectAlbum, isFocused, onBack }: HeaderProps) {
             ) : (
               <motion.span
                 key="empty"
-                className="text-muted group-hover:text-foreground"
+                className="pfm-interactive text-muted group-hover:text-foreground"
                 initial={reduceMotion ? false : { opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}

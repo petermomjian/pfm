@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { ArrowLeft, Pause, Play } from "lucide-react";
 import type { Album } from "@/data/albums";
 import { usePlayer } from "@/player/PlayerContext";
+import { useSettleOnMount } from "@/hooks/useSettleOnMount";
+import { PAGE_EXIT_MS, PAGE_ENTER_DELAY_MS, PAGE_ENTER_MS, PAGE_TRANSITION_DISTANCE } from "@/lib/motion";
 import { VinylMark } from "./VinylMark";
 import { TrackRow } from "./TrackRow";
 import { IconSwap } from "./icons/IconSwap";
@@ -128,9 +130,14 @@ interface FocusedAlbumProps {
   album: Album;
   onBack: () => void;
   isMobile: boolean;
+  // Set only while this view is mid library<->detail transition (see
+  // App.tsx's navTransition state) — "entering" right after the sleeve that
+  // opened it, "exiting" right before the sleeve that's reclaiming it. Null
+  // once the transition settles, leaving this view at a plain rest state.
+  navPhase?: "entering" | "exiting" | null;
 }
 
-export function FocusedAlbum({ album, onBack, isMobile }: FocusedAlbumProps) {
+export function FocusedAlbum({ album, onBack, isMobile, navPhase = null }: FocusedAlbumProps) {
   const { track, isAudioPlaying, playTrack } = usePlayer();
   const isThisAlbumPlaying = track && album.tracks.some((t) => t.id === track.id);
 
@@ -145,47 +152,85 @@ export function FocusedAlbum({ album, onBack, isMobile }: FocusedAlbumProps) {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [album.id]);
 
+  // "entering" mounts this view fresh, mid-transition — it must render
+  // already slid-down/faded on the very first paint so settling to rest a
+  // frame later actually animates (the settle itself happens almost
+  // immediately; PAGE_ENTER_DELAY_MS below is what actually holds the
+  // visible animation off). "exiting" needs no mount trick: the view is
+  // already mounted at rest when Back is pressed, so the prop change alone
+  // triggers the transition. Mirrors AlbumLibrary's own sink/rise handling
+  // so the two read as one continuous motion, both using the same
+  // --ease-page-transition curve: exiting starts immediately, entering
+  // waits out a delay rather than running fully concurrently — see
+  // PAGE_ENTER_DELAY_MS's doc in lib/motion.ts.
+  const navSettled = useSettleOnMount(navPhase === "entering");
+  const navAway = navPhase === "exiting" || (navPhase === "entering" && !navSettled);
+  const navStyle: CSSProperties = {
+    transform: navAway ? `translateY(${PAGE_TRANSITION_DISTANCE}px)` : "translateY(0px)",
+    opacity: navAway ? 0 : 1,
+    transition:
+      navPhase === "exiting"
+        ? `transform ${PAGE_EXIT_MS}ms var(--ease-page-transition), opacity ${PAGE_EXIT_MS}ms var(--ease-page-transition)`
+        : navPhase === "entering"
+          ? `transform ${PAGE_ENTER_MS}ms var(--ease-page-transition) ${PAGE_ENTER_DELAY_MS}ms, opacity ${PAGE_ENTER_MS}ms var(--ease-page-transition) ${PAGE_ENTER_DELAY_MS}ms`
+          : undefined,
+    // Sits above AlbumLibrary's own default z-index (0) for as long as this
+    // view is mounted — Library only ever outranks it briefly, while Back is
+    // actively carrying it back on top (see AlbumLibrary's `onTop` prop).
+    zIndex: 1,
+    // Belt-and-suspenders alongside the z-index: while sliding away this
+    // shouldn't intercept clicks meant for the library rising underneath it.
+    pointerEvents: navAway ? "none" : "auto",
+  };
+
   return (
-    <div className="pfm-fluid absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-48 pt-24 md:overflow-hidden md:px-16 md:py-[calc(var(--pfm-chrome-pad)_+_var(--pfm-chrome-row-h))]">
-      <div
-        ref={rowRef}
-        className="flex w-full flex-col items-center gap-8 md:h-full md:flex-row md:items-center md:justify-center md:gap-16"
-      >
-        <VinylMark
-          size={isMobile ? MOBILE_VINYL_SIZE : desktopVinylSize}
-          spinning={Boolean(isThisAlbumPlaying && isAudioPlaying)}
-          artworkSrc={album.coverArtVinyl}
-          className="shrink-0"
-        />
+    // bg-background: AlbumLibrary is always mounted underneath now (see
+    // App.tsx), so this needs its own opaque backdrop — without it the
+    // library would show through the transparent space around the vinyl and
+    // tracklist for as long as this view is open, not just during the
+    // transition's overlap window.
+    <div className="absolute inset-0 bg-background" style={navStyle}>
+      <div className="pfm-fluid absolute inset-0 flex flex-col items-center overflow-y-auto px-6 pb-48 pt-24 md:overflow-hidden md:px-16 md:py-[calc(var(--pfm-chrome-pad)_+_var(--pfm-chrome-row-h))]">
         <div
-          ref={infoRef}
-          className="flex w-full flex-col items-start justify-center gap-2.5 md:h-full md:w-auto md:min-w-64"
+          ref={rowRef}
+          className="flex w-full flex-col items-center gap-8 md:h-full md:flex-row md:items-center md:justify-center md:gap-16"
         >
-          <div className="hidden shrink-0 items-start pb-4 md:flex">
-            <BackToLibrary album={album} onBack={onBack} />
-          </div>
-          <div className="relative w-full md:min-h-0">
-            <div
-              ref={scrollRef}
-              className="pfm-no-scrollbar flex w-full flex-col items-start md:max-h-full md:overflow-y-auto"
-            >
-              {album.tracks.map((t) => (
-                <TrackRow
-                  key={t.id}
-                  track={t}
-                  isActive={track?.id === t.id}
-                  onPlay={() => playTrack(album.id, t.id)}
-                />
-              ))}
+          <VinylMark
+            size={isMobile ? MOBILE_VINYL_SIZE : desktopVinylSize}
+            spinning={Boolean(isThisAlbumPlaying && isAudioPlaying)}
+            artworkSrc={album.coverArtVinyl}
+            className="shrink-0"
+          />
+          <div
+            ref={infoRef}
+            className="flex w-full flex-col items-start justify-center gap-2.5 md:h-full md:w-auto md:min-w-64"
+          >
+            <div className="hidden shrink-0 items-start pb-4 md:flex">
+              <BackToLibrary album={album} onBack={onBack} />
             </div>
-            <div
-              className="pfm-interactive pointer-events-none absolute inset-x-0 top-0 hidden h-32 bg-gradient-to-b from-black to-transparent md:block"
-              style={{ opacity: showTopGradient ? 1 : 0 }}
-            />
-            <div
-              className="pfm-interactive pointer-events-none absolute inset-x-0 bottom-0 hidden h-32 bg-gradient-to-t from-black to-transparent md:block"
-              style={{ opacity: showBottomGradient ? 1 : 0 }}
-            />
+            <div className="relative w-full md:min-h-0">
+              <div
+                ref={scrollRef}
+                className="pfm-no-scrollbar flex w-full flex-col items-start pr-1 md:max-h-full md:overflow-y-auto"
+              >
+                {album.tracks.map((t) => (
+                  <TrackRow
+                    key={t.id}
+                    track={t}
+                    isActive={track?.id === t.id}
+                    onPlay={() => playTrack(album.id, t.id)}
+                  />
+                ))}
+              </div>
+              <div
+                className="pfm-interactive pointer-events-none absolute inset-x-0 top-0 hidden h-32 bg-gradient-to-b from-black to-transparent md:block"
+                style={{ opacity: showTopGradient ? 1 : 0 }}
+              />
+              <div
+                className="pfm-interactive pointer-events-none absolute inset-x-0 bottom-0 hidden h-32 bg-gradient-to-t from-black to-transparent md:block"
+                style={{ opacity: showBottomGradient ? 1 : 0 }}
+              />
+            </div>
           </div>
         </div>
       </div>

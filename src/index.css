@@ -32,6 +32,11 @@
   --surface-strong: #fffffff2;
   /* Kept in sync with EASE_OUT_SUBTLE in src/lib/motion.ts */
   --ease-out-subtle: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Library<->detail page transition only (see AlbumLibrary's sink and
+     FocusedAlbum's slide) — https://www.easing.dev/create/cubic-bezier#x1=0.5&y1=0&x2=0&y2=1.
+     Used for both the exiting and entering page alike, not paired with a
+     separate mirrored curve. */
+  --ease-page-transition: cubic-bezier(0.5, 0, 0, 1);
   /* Desktop header/footer chrome: page padding (py-9) + fixed row height.
      Kept in sync with Header.tsx/GlobalPlayerBar.tsx's md:h-[var(--pfm-chrome-row-h)]
      and App.tsx's py-9 — FocusedAlbum insets by (pad + row) on each edge so
